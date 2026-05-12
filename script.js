@@ -26,12 +26,13 @@ const presetSaveBtn   = document.getElementById('presetSaveBtn');
 const presetSaveForm  = document.getElementById('presetSaveForm');
 const presetSaveInput = document.getElementById('presetSaveInput');
 const themePicker     = document.getElementById('themePicker');
-const sleepControl    = document.getElementById('sleepControl');
-const sleepToggle     = document.getElementById('sleepToggle');
-const sleepLabel      = document.getElementById('sleepLabel');
-const sleepOptions    = document.getElementById('sleepOptions');
 const sleepDim        = document.getElementById('sleepDim');
-const sleepWake       = document.getElementById('sleepWake');
+const sleepPanel      = document.getElementById('sleepPanel');
+const modeTabs        = document.querySelectorAll('.mode-tab');
+const modeTrack       = document.getElementById('modeTrack');
+const modeViewport    = document.getElementById('modeViewport');
+const focusTabBtn     = document.getElementById('focusTabBtn');
+const sleepTabBtn     = document.getElementById('sleepTabBtn');
 const statsTodayMins  = document.getElementById('statsTodayMins');
 const statsStreakWrap = document.getElementById('statsStreakWrap');
 const statsStreakNumber = document.getElementById('statsStreakNumber');
@@ -1245,11 +1246,49 @@ immersiveToggle.addEventListener('click', () => {
   saveState();
 });
 
+// ---------- Mode tabs (Focus / Sleep) ----------
+let currentMode = 'focus'; // 'focus' | 'sleep'
+
+function switchMode(mode) {
+  if (currentMode === mode) return;
+  currentMode = mode;
+  modeTrack.classList.toggle('show-sleep', mode === 'sleep');
+  modeTabs.forEach(tab => {
+    const isActive = tab.dataset.mode === mode;
+    tab.classList.toggle('active', isActive);
+    tab.setAttribute('aria-selected', String(isActive));
+  });
+  if (mode === 'sleep') renderSleepPanel();
+}
+
+modeTabs.forEach(tab => {
+  tab.addEventListener('click', () => switchMode(tab.dataset.mode));
+});
+
+// Touch swipe support
+let touchStartX = null;
+let touchStartY = null;
+modeViewport.addEventListener('touchstart', (e) => {
+  touchStartX = e.changedTouches[0].screenX;
+  touchStartY = e.changedTouches[0].screenY;
+}, { passive: true });
+
+modeViewport.addEventListener('touchend', (e) => {
+  if (touchStartX === null) return;
+  const dx = e.changedTouches[0].screenX - touchStartX;
+  const dy = e.changedTouches[0].screenY - touchStartY;
+  touchStartX = touchStartY = null;
+  // Require mostly-horizontal swipe of at least 50px so we don't fight scrolling
+  if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy)) return;
+  if (dx < 0) switchMode('sleep');
+  else        switchMode('focus');
+}, { passive: true });
+
 // ---------- Sleep mode ----------
-// User clicks Sleep → popup shows duration options (15/30/45/60 min).
-// Selecting a duration starts a fade: master volume + screen dim slide
-// over the chosen window. At the end, all sounds stop and a 'Tap to wake'
-// button appears. User can cancel at any time via the × on the toggle.
+// Lives entirely in the Sleep panel. Selecting a duration starts a fade:
+// master volume + screen dim slide over the chosen window. At the end,
+// all sounds stop and the panel shows a 'Tap to wake' button. User can
+// cancel at any time via the Cancel button in the panel.
 
 const sleep = {
   active: false,
@@ -1258,8 +1297,83 @@ const sleep = {
   durationSec: 0,
   intervalId: null,
   savedMasterVolume: 50,
-  preservedActiveSounds: [],
 };
+
+const MOON_SVG = `
+  <svg class="sleep-moon" viewBox="0 0 24 24" width="40" height="40" aria-hidden="true">
+    <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linejoin="round" stroke-linecap="round"/>
+  </svg>
+`;
+
+function renderSleepPanel() {
+  if (!sleepPanel) return;
+
+  if (sleep.active) {
+    const remaining = Math.max(0, sleep.durationSec - (Date.now() - sleep.startTime) / 1000);
+    const mins = Math.floor(remaining / 60);
+    const secs = Math.floor(remaining % 60);
+    sleepPanel.innerHTML = `
+      ${MOON_SVG}
+      <div class="sleep-countdown-big">${mins}:${String(secs).padStart(2, '0')}</div>
+      <div class="sleep-state-label">remaining</div>
+      <button class="sleep-action-btn" type="button" id="sleepCancelBtn">Cancel</button>
+      <div class="sleep-hint">Sound fading…</div>
+    `;
+    sleepPanel.querySelector('#sleepCancelBtn').addEventListener('click', cancelSleep);
+    return;
+  }
+
+  if (sleep.completed) {
+    sleepPanel.innerHTML = `
+      ${MOON_SVG}
+      <div class="sleep-state-label">Asleep</div>
+      <button class="sleep-action-btn primary" type="button" id="sleepWakeBtn">Tap to wake</button>
+    `;
+    sleepPanel.querySelector('#sleepWakeBtn').addEventListener('click', wakeUp);
+    return;
+  }
+
+  // Idle state
+  sleepPanel.innerHTML = `
+    ${MOON_SVG}
+    <h2 class="sleep-headline">Drift off gently</h2>
+    <p class="sleep-blurb">Your active sounds will fade smoothly to silence over the time you choose. Pick a duration to begin.</p>
+    <div class="sleep-durations">
+      <button class="sleep-duration-card" type="button" data-min="15"><span class="num">15</span><span class="unit">min</span></button>
+      <button class="sleep-duration-card" type="button" data-min="30"><span class="num">30</span><span class="unit">min</span></button>
+      <button class="sleep-duration-card" type="button" data-min="45"><span class="num">45</span><span class="unit">min</span></button>
+      <button class="sleep-duration-card" type="button" data-min="60"><span class="num">60</span><span class="unit">min</span></button>
+    </div>
+    <div class="sleep-active-sounds" id="sleepActiveSoundsWrap"></div>
+  `;
+  sleepPanel.querySelectorAll('.sleep-duration-card').forEach(card => {
+    card.addEventListener('click', () => startSleep(parseInt(card.dataset.min, 10)));
+  });
+  renderSleepActiveSounds();
+}
+
+const SOUND_LABELS = {
+  waves: 'Ocean Waves',
+  rain: 'Light Rain',
+  underwater: 'Underwater',
+  thunder: 'Soft Thunder',
+};
+
+function renderSleepActiveSounds() {
+  const wrap = document.getElementById('sleepActiveSoundsWrap');
+  if (!wrap) return;
+  const active = Object.entries(soundState).filter(([, s]) => s.active).map(([id]) => id);
+  if (active.length === 0) {
+    wrap.innerHTML = `<div class="sleep-no-sounds">No sounds active — pick some on the Focus tab first.</div>`;
+  } else {
+    wrap.innerHTML = `
+      <div class="sleep-active-label">Active sounds (${active.length})</div>
+      <div class="sleep-active-list">
+        ${active.map(id => `<span class="sleep-active-pill">${SOUND_LABELS[id] || id}</span>`).join('')}
+      </div>
+    `;
+  }
+}
 
 function startSleep(minutes) {
   if (sleep.active) return;
@@ -1268,20 +1382,17 @@ function startSleep(minutes) {
   sleep.startTime = Date.now();
   sleep.durationSec = minutes * 60;
   sleep.savedMasterVolume = masterVolume;
-  sleep.preservedActiveSounds = Object.entries(soundState)
-    .filter(([, s]) => s.active).map(([id]) => id);
 
   // Pause any running timer so phase-complete chimes don't wake the sleeper
   if (state.running) pause();
 
-  closeSleepOptions();
   document.body.classList.add('sleeping');
   document.body.classList.remove('sleep-complete');
   document.documentElement.style.setProperty('--sleep-dim', '0');
 
-  renderSleepToggle();
+  renderSleepPanel();
   sleep.intervalId = setInterval(tickSleep, 500);
-  tickSleep(); // immediate update
+  tickSleep();
 }
 
 function tickSleep() {
@@ -1289,21 +1400,17 @@ function tickSleep() {
   const elapsedSec = (Date.now() - sleep.startTime) / 1000;
   const fraction = Math.min(elapsedSec / sleep.durationSec, 1);
 
-  // Fade master volume linearly from saved → 0
   const newMaster = Math.max(0, sleep.savedMasterVolume * (1 - fraction));
   masterVolume = newMaster;
   if (masterGain && audioCtx) {
     masterGain.gain.setTargetAtTime(newMaster / 100 * 0.6, audioCtx.currentTime, 1.0);
   }
-  // Reflect the fade in the slider so the user can see it sliding down
   masterSlider.value = Math.round(newMaster);
   volValue.textContent = Math.round(newMaster);
 
-  // Fade screen dim 0 → 1 across the same window
   document.documentElement.style.setProperty('--sleep-dim', String(fraction));
 
-  // Update countdown display
-  renderSleepToggle();
+  renderSleepPanel();
 
   if (fraction >= 1) completeSleep();
 }
@@ -1315,22 +1422,18 @@ function completeSleep() {
   sleep.active = false;
   sleep.completed = true;
 
-  // Stop all currently active sounds cleanly
   Object.keys(activeNodes).forEach(id => deactivateSound(id));
 
   document.body.classList.remove('sleeping');
   document.body.classList.add('sleep-complete');
-  sleepWake.hidden = false;
 
-  renderSleepToggle();
+  renderSleepPanel();
 }
 
 function wakeUp() {
-  // Called when user taps the wake button or × on the toggle after completion
   sleep.completed = false;
   sleep.active = false;
 
-  // Restore master volume to what it was before sleep started
   masterVolume = sleep.savedMasterVolume;
   if (masterGain && audioCtx) {
     masterGain.gain.setTargetAtTime(masterVolume / 100 * 0.6, audioCtx.currentTime, 0.5);
@@ -1340,9 +1443,8 @@ function wakeUp() {
 
   document.body.classList.remove('sleeping', 'sleep-complete');
   document.documentElement.style.setProperty('--sleep-dim', '0');
-  sleepWake.hidden = true;
 
-  renderSleepToggle();
+  renderSleepPanel();
 }
 
 function cancelSleep() {
@@ -1351,7 +1453,6 @@ function cancelSleep() {
     sleep.intervalId = null;
     sleep.active = false;
 
-    // Restore master volume
     masterVolume = sleep.savedMasterVolume;
     if (masterGain && audioCtx) {
       masterGain.gain.setTargetAtTime(masterVolume / 100 * 0.6, audioCtx.currentTime, 0.5);
@@ -1362,78 +1463,13 @@ function cancelSleep() {
 
   document.body.classList.remove('sleeping', 'sleep-complete');
   document.documentElement.style.setProperty('--sleep-dim', '0');
-  sleepWake.hidden = true;
   sleep.completed = false;
 
-  renderSleepToggle();
+  renderSleepPanel();
 }
 
-function renderSleepToggle() {
-  if (sleep.active) {
-    sleepToggle.classList.add('active');
-    const remaining = Math.max(0, sleep.durationSec - (Date.now() - sleep.startTime) / 1000);
-    const mins = Math.floor(remaining / 60);
-    const secs = Math.floor(remaining % 60);
-    sleepLabel.innerHTML = `<span class="sleep-countdown">${mins}:${String(secs).padStart(2, '0')}</span>
-      <button class="sleep-cancel" type="button" aria-label="Cancel sleep">×</button>`;
-    // Hide the PRO badge while active
-    sleepToggle.querySelector('.pro-badge').style.display = 'none';
-    // Wire the × button
-    const x = sleepLabel.querySelector('.sleep-cancel');
-    if (x) x.addEventListener('click', (e) => { e.stopPropagation(); cancelSleep(); });
-  } else if (sleep.completed) {
-    sleepToggle.classList.add('active');
-    sleepLabel.innerHTML = `Asleep
-      <button class="sleep-cancel" type="button" aria-label="Wake up">×</button>`;
-    sleepToggle.querySelector('.pro-badge').style.display = 'none';
-    const x = sleepLabel.querySelector('.sleep-cancel');
-    if (x) x.addEventListener('click', (e) => { e.stopPropagation(); wakeUp(); });
-  } else {
-    sleepToggle.classList.remove('active');
-    sleepLabel.textContent = 'Sleep';
-    sleepToggle.querySelector('.pro-badge').style.display = '';
-  }
-}
-
-function openSleepOptions() {
-  sleepControl.classList.add('open');
-}
-
-function closeSleepOptions() {
-  sleepControl.classList.remove('open');
-}
-
-sleepToggle.addEventListener('click', (e) => {
-  // If we're clicking on the × cancel/wake button, the inner handler ran already
-  if (e.target.closest('.sleep-cancel')) return;
-  if (sleep.active || sleep.completed) return; // ignore; cancel via the ×
-  if (sleepControl.classList.contains('open')) closeSleepOptions();
-  else openSleepOptions();
-});
-
-sleepOptions.addEventListener('click', (e) => {
-  const btn = e.target.closest('.sleep-duration');
-  if (!btn) return;
-  const minutes = parseInt(btn.dataset.min, 10);
-  if (minutes > 0) startSleep(minutes);
-});
-
-sleepWake.addEventListener('click', wakeUp);
 sleepDim.addEventListener('click', () => {
   if (sleep.completed) wakeUp();
-});
-
-// Close options on outside click
-document.addEventListener('click', (e) => {
-  if (!sleepControl.classList.contains('open')) return;
-  if (!sleepControl.contains(e.target)) closeSleepOptions();
-});
-
-// Escape closes options
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && sleepControl.classList.contains('open')) {
-    closeSleepOptions();
-  }
 });
 
 // ---------- Theme picker ----------
@@ -1471,6 +1507,7 @@ render();
 renderSoundUI();
 renderPresets();
 renderStats();
+renderSleepPanel();
 applyImmersive();
 applyTheme();
 animateWave();

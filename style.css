@@ -1260,19 +1260,12 @@ input[type="range"]::-moz-range-thumb {
    IMMERSIVE MODE
    ========================================================= */
 
-/* Top-right control bar (wraps sleep + immersive) */
-.top-bar {
+/* Immersive toggle (top-right, standalone) */
+.immersive-toggle {
   position: fixed;
   top: 22px;
   right: 22px;
   z-index: 50;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-/* Toggle button (in the top-bar group) */
-.immersive-toggle {
   background: rgba(255, 255, 255, 0.07);
   backdrop-filter: blur(14px) saturate(140%);
   -webkit-backdrop-filter: blur(14px) saturate(140%);
@@ -1318,116 +1311,272 @@ input[type="range"]::-moz-range-thumb {
 }
 
 /* =========================================================
-   SLEEP MODE
+   MODE TABS + SWIPEABLE PANELS (Focus / Sleep)
    ========================================================= */
 
-.sleep-control {
-  position: relative;
+.mode-tabs {
   display: inline-flex;
-  align-items: center;
+  align-self: center;
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  padding: 4px;
+  gap: 2px;
+  margin-bottom: 8px;
 }
 
-.sleep-toggle {
-  background: rgba(255, 255, 255, 0.07);
-  backdrop-filter: blur(14px) saturate(140%);
-  -webkit-backdrop-filter: blur(14px) saturate(140%);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 999px;
-  padding: 8px 12px 8px 14px;
-  color: var(--c-text-soft);
+.mode-tab {
+  background: transparent;
+  border: none;
+  color: var(--c-text-faint);
   font-family: var(--font-body);
   font-size: 12px;
   font-weight: 500;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.08em;
+  padding: 8px 22px;
+  border-radius: 999px;
   cursor: pointer;
+  transition: color 0.25s ease, background 0.3s ease, box-shadow 0.3s ease;
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  transition: all 0.25s ease;
   white-space: nowrap;
 }
 
-.sleep-toggle:hover {
-  background: rgba(255, 255, 255, 0.13);
+.mode-tab:hover:not(.active) {
+  color: var(--c-text-soft);
+}
+
+.mode-tab.active {
   color: var(--c-foam);
-  transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(127, 209, 197, 0.15);
+  background: linear-gradient(135deg, rgba(127, 209, 197, 0.28), rgba(168, 230, 220, 0.18));
+  box-shadow: 0 2px 12px rgba(127, 209, 197, 0.18);
 }
 
-.sleep-toggle.active {
-  background: linear-gradient(135deg, rgba(127, 209, 197, 0.32), rgba(168, 230, 220, 0.22));
-  color: var(--c-foam);
-  border-color: rgba(168, 230, 220, 0.45);
-  box-shadow: 0 4px 24px rgba(127, 209, 197, 0.3);
+.mode-viewport {
+  width: 100%;
+  overflow: hidden;
+  /* Allow content height to determine the panel height */
 }
 
-.sleep-icon svg { display: block; }
-
-/* The countdown display while sleeping (replaces the label) */
-.sleep-countdown {
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.04em;
-}
-
-.sleep-cancel {
-  background: transparent;
-  border: none;
-  color: currentColor;
-  font-size: 14px;
-  cursor: pointer;
-  padding: 0 2px;
-  line-height: 1;
-  opacity: 0.7;
-  transition: opacity 0.2s;
-}
-.sleep-cancel:hover { opacity: 1; }
-
-/* Duration options popout */
-.sleep-options {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
+.mode-track {
   display: flex;
-  gap: 4px;
-  padding: 6px;
-  background: rgba(15, 38, 48, 0.85);
-  backdrop-filter: blur(20px) saturate(140%);
-  -webkit-backdrop-filter: blur(20px) saturate(140%);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 12px;
-  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.35);
-  opacity: 0;
-  transform: translateY(-6px);
+  width: 200%;
+  transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  touch-action: pan-y; /* allow vertical scroll inside, horizontal swipe captured by JS */
+}
+
+.mode-track.show-sleep {
+  transform: translateX(-50%);
+}
+
+.mode-panel {
+  flex: 0 0 50%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  /* Fade out the inactive panel slightly */
+  transition: opacity 0.4s ease;
+}
+
+.mode-track:not(.show-sleep) .mode-panel[data-mode="sleep"] {
+  opacity: 0.3;
   pointer-events: none;
-  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.mode-track.show-sleep .mode-panel[data-mode="focus"] {
+  opacity: 0.3;
+  pointer-events: none;
 }
 
-.sleep-control.open .sleep-options {
-  opacity: 1;
-  transform: translateY(0);
-  pointer-events: auto;
+/* =========================================================
+   SLEEP PANEL CONTENT
+   ========================================================= */
+
+.sleep-panel-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 22px;
+  padding: 40px 28px;
+  text-align: center;
+  min-height: 480px;
+  justify-content: center;
 }
 
-.sleep-duration {
+.sleep-moon {
+  color: var(--c-foam);
+  opacity: 0.85;
+  filter: drop-shadow(0 0 20px rgba(168, 230, 220, 0.35));
+  animation: moon-breathe 5s ease-in-out infinite;
+}
+
+@keyframes moon-breathe {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50%      { opacity: 1;   transform: scale(1.05); }
+}
+
+.sleep-headline {
+  font-family: var(--font-display);
+  font-weight: 300;
+  font-size: 32px;
+  color: var(--c-foam);
+  letter-spacing: -0.01em;
+  margin: 4px 0 0;
+}
+
+.sleep-blurb {
+  font-size: 13px;
+  color: var(--c-text-soft);
+  max-width: 320px;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.sleep-durations {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  width: 100%;
+  max-width: 360px;
+  margin-top: 8px;
+}
+
+.sleep-duration-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 14px 10px;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.12);
-  color: var(--c-text-soft);
+  border-radius: 14px;
+  cursor: pointer;
   font-family: var(--font-body);
-  font-size: 12px;
+  color: var(--c-foam);
+  transition: all 0.2s ease;
+}
+
+.sleep-duration-card:hover {
+  background: linear-gradient(135deg, rgba(127, 209, 197, 0.22), rgba(168, 230, 220, 0.15));
+  border-color: rgba(168, 230, 220, 0.4);
+  transform: translateY(-1px);
+}
+
+.sleep-duration-card .num {
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 400;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.sleep-duration-card .unit {
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--c-text-faint);
   font-weight: 500;
-  padding: 6px 12px;
+}
+
+.sleep-active-sounds {
+  margin-top: 8px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  width: 100%;
+}
+
+.sleep-active-label {
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--c-text-faint);
+  font-weight: 500;
+  margin-bottom: 10px;
+}
+
+.sleep-active-list {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+
+.sleep-active-pill {
+  font-size: 12px;
+  padding: 4px 10px;
+  background: rgba(168, 230, 220, 0.12);
+  border: 1px solid rgba(168, 230, 220, 0.25);
+  border-radius: 999px;
+  color: var(--c-foam);
+}
+
+.sleep-no-sounds {
+  font-size: 12px;
+  color: var(--c-text-faint);
+  font-style: italic;
+}
+
+/* Active (countdown running) state */
+.sleep-countdown-big {
+  font-family: var(--font-display);
+  font-weight: 300;
+  font-size: 64px;
+  color: var(--c-foam);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  line-height: 1;
+  text-shadow: 0 0 30px rgba(168, 230, 220, 0.4);
+}
+
+.sleep-state-label {
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--c-text-faint);
+  font-weight: 500;
+}
+
+.sleep-action-btn {
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: var(--c-text-soft);
+  padding: 12px 28px;
   border-radius: 999px;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
-.sleep-duration:hover {
-  background: linear-gradient(135deg, rgba(127, 209, 197, 0.28), rgba(168, 230, 220, 0.18));
+.sleep-action-btn:hover {
+  background: rgba(255, 255, 255, 0.13);
+  color: var(--c-foam);
+}
+
+.sleep-action-btn.primary {
+  background: linear-gradient(135deg, rgba(127, 209, 197, 0.3), rgba(168, 230, 220, 0.2));
   border-color: rgba(168, 230, 220, 0.4);
   color: var(--c-foam);
 }
 
-/* Screen dim during sleep mode (opacity driven by --sleep-dim) */
+.sleep-action-btn.primary:hover {
+  background: linear-gradient(135deg, rgba(127, 209, 197, 0.45), rgba(168, 230, 220, 0.3));
+  box-shadow: 0 6px 24px rgba(127, 209, 197, 0.25);
+}
+
+.sleep-hint {
+  font-size: 11px;
+  color: var(--c-text-faint);
+  letter-spacing: 0.05em;
+  font-style: italic;
+}
+
+/* Screen dim during sleep mode */
 .sleep-dim {
   position: fixed;
   inset: 0;
@@ -1439,45 +1588,20 @@ input[type="range"]::-moz-range-thumb {
 }
 
 body.sleeping .sleep-dim {
-  opacity: calc(var(--sleep-dim, 0) * 0.96);
+  opacity: calc(var(--sleep-dim, 0) * 0.94);
 }
 
 body.sleep-complete .sleep-dim {
-  opacity: 0.96;
+  opacity: 0.94;
   pointer-events: auto;
   cursor: pointer;
 }
 
-/* 'Tap to wake' button shown after sleep cycle completes */
-.sleep-wake {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 110;
-  background: rgba(255, 255, 255, 0.06);
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(168, 230, 220, 0.3);
-  color: var(--c-foam);
-  font-family: var(--font-body);
-  font-size: 13px;
-  font-weight: 400;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  padding: 14px 26px;
-  border-radius: 999px;
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity 1.2s ease 0.4s;
-}
-
-.sleep-wake:hover {
-  background: rgba(168, 230, 220, 0.15);
-  border-color: rgba(168, 230, 220, 0.5);
-}
-
-body.sleep-complete .sleep-wake:not([hidden]) {
-  opacity: 0.85;
+/* Sleep panel rises above the dim when sleep is active/complete */
+body.sleeping .mode-panel[data-mode="sleep"],
+body.sleep-complete .mode-panel[data-mode="sleep"] {
+  position: relative;
+  z-index: 105;
 }
 
 /* Hidden by default; revealed in immersive mode */
