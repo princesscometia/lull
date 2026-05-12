@@ -176,6 +176,16 @@
         <span class="sound-subtitle">Mix &amp; match</span>
       </div>
 
+      <div class="presets-row" id="presetsRow">
+        <!-- Built-in presets are rendered first, then custom, then the save chip last -->
+        <div class="preset-save-chip" id="presetSaveChip">
+          <button class="preset-save-btn" id="presetSaveBtn" type="button" aria-label="Save current mix as a preset">+ Save mix</button>
+          <form class="preset-save-form" id="presetSaveForm" autocomplete="off">
+            <input class="preset-save-input" id="presetSaveInput" type="text" placeholder="Name this mix…" maxlength="24" aria-label="Mix name" />
+          </form>
+        </div>
+      </div>
+
       <div class="mixer">
         <div class="mixer-row" data-sound="waves">
           <button class="sound-row-toggle" aria-label="Toggle Ocean Waves">

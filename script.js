@@ -20,6 +20,11 @@ const durationControls = document.querySelectorAll('.duration-control');
 const chimeSlider  = document.getElementById('chimeVolume');
 const chimeValueEl = document.getElementById('chimeVolumeValue');
 const immersiveToggle = document.getElementById('immersiveToggle');
+const presetsRow      = document.getElementById('presetsRow');
+const presetSaveChip  = document.getElementById('presetSaveChip');
+const presetSaveBtn   = document.getElementById('presetSaveBtn');
+const presetSaveForm  = document.getElementById('presetSaveForm');
+const presetSaveInput = document.getElementById('presetSaveInput');
 
 // ---------- State ----------
 const RING_CIRCUMFERENCE = 678.58; // 2 * π * 108
@@ -64,6 +69,23 @@ let masterVolume = 50;
 // loud default) so users have full range from silent to original-loud.
 let chimeVolume = 25;
 let immersiveMode = false;
+
+// ---------- Preset library ----------
+const BUILTIN_PRESETS = [
+  { id: 'quiet-cove',     label: 'Quiet Cove',     master: 50,
+    sounds: { waves: 55, rain: 0,  underwater: 25, thunder: 0  }, active: ['waves', 'underwater'] },
+  { id: 'light-rain',     label: 'Light Rain',     master: 50,
+    sounds: { waves: 30, rain: 55, underwater: 0,  thunder: 0  }, active: ['waves', 'rain'] },
+  { id: 'stormy-day',     label: 'Stormy Day',     master: 60,
+    sounds: { waves: 70, rain: 50, underwater: 0,  thunder: 65 }, active: ['waves', 'rain', 'thunder'] },
+  { id: 'distant-storm',  label: 'Distant Storm',  master: 55,
+    sounds: { waves: 45, rain: 0,  underwater: 0,  thunder: 55 }, active: ['waves', 'thunder'] },
+  { id: 'deep-dive',      label: 'Deep Dive',      master: 50,
+    sounds: { waves: 20, rain: 0,  underwater: 80, thunder: 0  }, active: ['waves', 'underwater'] },
+];
+
+const CUSTOM_PRESETS_KEY = 'lull-custom-presets-v1';
+let currentPresetId = null;
 // Smart hybrid: linked if the first sound was started while a timer was running.
 // Independent if the user started a mix while idle (pure ambience).
 let mixLinkedToTimer = false;
@@ -781,6 +803,149 @@ function playChime() {
 }
 
 // =========================================================
+//   PRESETS
+// =========================================================
+
+function getCustomPresets() {
+  try {
+    const raw = localStorage.getItem(CUSTOM_PRESETS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) { return []; }
+}
+
+function writeCustomPresets(list) {
+  localStorage.setItem(CUSTOM_PRESETS_KEY, JSON.stringify(list));
+}
+
+function applyPreset(preset) {
+  // Master volume
+  masterVolume = preset.master;
+  masterSlider.value = masterVolume;
+  volValue.textContent = masterVolume;
+  if (masterGain && audioCtx) {
+    masterGain.gain.setTargetAtTime(masterVolume / 100 * 0.6, audioCtx.currentTime, 0.05);
+  }
+
+  // Per-sound volumes (update state + live bus gain without saving each one)
+  Object.entries(preset.sounds).forEach(([id, vol]) => {
+    if (!soundState[id]) return;
+    soundState[id].volume = vol;
+    const nodes = activeNodes[id];
+    if (nodes && audioCtx) {
+      nodes.bus.gain.setTargetAtTime(vol / 100, audioCtx.currentTime, 0.05);
+    }
+  });
+
+  // Activate / deactivate to match the preset's active list
+  const wantActive = new Set(preset.active);
+  Object.keys(soundState).forEach(id => {
+    const isActive = soundState[id].active;
+    if (wantActive.has(id) && !isActive)  activateSound(id);
+    if (!wantActive.has(id) && isActive)  deactivateSound(id);
+  });
+
+  currentPresetId = preset.id;
+  saveState();
+  renderSoundUI();
+  renderPresets();
+}
+
+function saveCurrentMixAs(name) {
+  const clean = name.trim();
+  if (!clean) return;
+  const list = getCustomPresets();
+  const preset = {
+    id: 'custom-' + Date.now(),
+    label: clean.slice(0, 24),
+    master: masterVolume,
+    sounds: {
+      waves:      soundState.waves.volume,
+      rain:       soundState.rain.volume,
+      underwater: soundState.underwater.volume,
+      thunder:    soundState.thunder.volume,
+    },
+    active: Object.entries(soundState).filter(([, s]) => s.active).map(([id]) => id),
+  };
+  list.push(preset);
+  writeCustomPresets(list);
+  currentPresetId = preset.id;
+  renderPresets();
+}
+
+function deleteCustomPreset(id) {
+  const list = getCustomPresets().filter(p => p.id !== id);
+  writeCustomPresets(list);
+  if (currentPresetId === id) currentPresetId = null;
+  renderPresets();
+}
+
+function makeChip(preset, isCustom) {
+  if (isCustom) {
+    const wrap = document.createElement('div');
+    wrap.className = 'preset-chip-wrap';
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'preset-chip custom' + (currentPresetId === preset.id ? ' active' : '');
+    btn.textContent = preset.label;
+    btn.addEventListener('click', () => {
+      applyPreset(preset);
+      bumpChip(btn);
+    });
+
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'preset-delete';
+    del.setAttribute('aria-label', `Delete preset ${preset.label}`);
+    del.textContent = '×';
+    del.addEventListener('click', (e) => {
+      e.stopPropagation();
+      deleteCustomPreset(preset.id);
+    });
+
+    wrap.appendChild(btn);
+    wrap.appendChild(del);
+    return wrap;
+  }
+
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'preset-chip' + (currentPresetId === preset.id ? ' active' : '');
+  btn.textContent = preset.label;
+  btn.addEventListener('click', () => {
+    applyPreset(preset);
+    bumpChip(btn);
+  });
+  return btn;
+}
+
+function bumpChip(el) {
+  el.classList.remove('bump');
+  void el.offsetWidth;
+  el.classList.add('bump');
+  setTimeout(() => el.classList.remove('bump'), 200);
+}
+
+function renderPresets() {
+  // Remove all existing chips except the save chip
+  presetsRow.querySelectorAll('.preset-chip, .preset-chip-wrap').forEach(el => el.remove());
+
+  // Built-ins first
+  BUILTIN_PRESETS.forEach(p => presetsRow.insertBefore(makeChip(p, false), presetSaveChip));
+
+  // Then any custom presets
+  getCustomPresets().forEach(p => presetsRow.insertBefore(makeChip(p, true), presetSaveChip));
+}
+
+// Clear current-preset highlight when user manually edits the mix
+function noteMixDirtied() {
+  if (currentPresetId !== null) {
+    currentPresetId = null;
+    renderPresets();
+  }
+}
+
+// =========================================================
 //   EVENT LISTENERS
 // =========================================================
 
@@ -797,6 +962,7 @@ document.querySelectorAll('.sound-row-toggle').forEach(btn => {
     const row = btn.closest('.mixer-row');
     if (!row) return;
     toggleSoundById(row.dataset.sound);
+    noteMixDirtied();
   });
 });
 
@@ -804,11 +970,39 @@ document.querySelectorAll('.sound-volume').forEach(slider => {
   slider.addEventListener('input', (e) => {
     const id = e.target.dataset.sound;
     setSoundVolume(id, parseInt(e.target.value, 10));
+    noteMixDirtied();
   });
 });
 
 masterSlider.addEventListener('input', (e) => {
   setMasterVolume(parseInt(e.target.value, 10));
+  noteMixDirtied();
+});
+
+// ---------- Save preset flow ----------
+presetSaveBtn.addEventListener('click', () => {
+  presetSaveChip.classList.add('saving');
+  presetSaveInput.value = '';
+  presetSaveInput.focus();
+});
+
+presetSaveForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const name = presetSaveInput.value.trim();
+  presetSaveChip.classList.remove('saving');
+  if (name) saveCurrentMixAs(name);
+});
+
+presetSaveInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    presetSaveChip.classList.remove('saving');
+  }
+});
+
+presetSaveInput.addEventListener('blur', () => {
+  // Cancel if blurred without committing
+  setTimeout(() => presetSaveChip.classList.remove('saving'), 100);
 });
 
 // ---------- Duration controls (wheel / click / keyboard) ----------
@@ -918,5 +1112,6 @@ loadState();
 initWave();
 render();
 renderSoundUI();
+renderPresets();
 applyImmersive();
 animateWave();

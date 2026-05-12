@@ -533,6 +533,132 @@ body {
   text-transform: uppercase;
 }
 
+/* =========================================================
+   PRESETS — quick-pick mood chips + save-your-own
+   ========================================================= */
+
+.presets-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.preset-chip,
+.preset-save-btn {
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--c-text-soft);
+  padding: 6px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.preset-chip:hover,
+.preset-save-btn:hover {
+  background: rgba(255, 255, 255, 0.11);
+  color: var(--c-foam);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.preset-chip.active {
+  background: linear-gradient(135deg, rgba(127, 209, 197, 0.28), rgba(168, 230, 220, 0.18));
+  color: var(--c-foam);
+  border-color: rgba(168, 230, 220, 0.4);
+  box-shadow: 0 2px 12px rgba(127, 209, 197, 0.18);
+}
+
+.preset-chip.bump {
+  transform: scale(1.06);
+  transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Wrapper for custom (saved) presets to host the delete button on hover */
+.preset-chip-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.preset-chip-wrap .preset-chip {
+  padding-right: 12px;
+}
+
+.preset-delete {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  background: rgba(20, 40, 50, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: var(--c-text-soft);
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transform: scale(0.7);
+  transition: opacity 0.15s ease, transform 0.15s ease, background 0.15s ease;
+  padding: 0;
+}
+
+.preset-chip-wrap:hover .preset-delete,
+.preset-delete:focus-visible {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.preset-delete:hover {
+  background: rgba(80, 30, 40, 0.95);
+  color: var(--c-foam);
+}
+
+/* Save chip — has two visual modes: button or inline input */
+.preset-save-chip {
+  display: inline-flex;
+  align-items: center;
+}
+
+.preset-save-chip .preset-save-form {
+  display: none;
+}
+
+.preset-save-chip.saving .preset-save-btn {
+  display: none;
+}
+
+.preset-save-chip.saving .preset-save-form {
+  display: inline-flex;
+}
+
+.preset-save-input {
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 500;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(168, 230, 220, 0.35);
+  color: var(--c-foam);
+  padding: 6px 12px;
+  border-radius: 999px;
+  outline: none;
+  width: 140px;
+  letter-spacing: 0.02em;
+}
+
+.preset-save-input::placeholder {
+  color: var(--c-text-faint);
+}
+
 .mixer {
   display: flex;
   flex-direction: column;
