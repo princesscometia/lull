@@ -894,7 +894,7 @@ body.immersive .immersive-only {
   position: fixed;
   inset: 0;
   z-index: 0;
-  background: linear-gradient(180deg, #0a2638 0%, #051724 35%, #020e18 70%, #01060e 100%);
+  background: linear-gradient(180deg, #14495a 0%, #0a3848 35%, #062a3a 70%, #03192a 100%);
   opacity: 0;
   pointer-events: none;
   transition: opacity 2.8s cubic-bezier(0.4, 0, 0.2, 1);
