@@ -106,6 +106,10 @@
   <!-- Sleep mode dim overlay -->
   <div class="sleep-dim" id="sleepDim" aria-hidden="true"></div>
 
+  <!-- Wake button — body-level so it's not trapped inside the mode-track's
+       stacking context. Visibility is driven by body.sleep-complete. -->
+  <button class="sleep-wake-button" id="sleepWakeButton" type="button" aria-label="Tap to wake">Tap to wake</button>
+
   <!-- App shell -->
   <main class="app">
     <header class="header">

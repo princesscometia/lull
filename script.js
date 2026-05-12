@@ -26,8 +26,9 @@ const presetSaveBtn   = document.getElementById('presetSaveBtn');
 const presetSaveForm  = document.getElementById('presetSaveForm');
 const presetSaveInput = document.getElementById('presetSaveInput');
 const themePicker     = document.getElementById('themePicker');
-const sleepDim        = document.getElementById('sleepDim');
-const sleepPanel      = document.getElementById('sleepPanel');
+const sleepDim         = document.getElementById('sleepDim');
+const sleepPanel       = document.getElementById('sleepPanel');
+const sleepWakeButton  = document.getElementById('sleepWakeButton');
 const modeTabs        = document.querySelectorAll('.mode-tab');
 const modeTrack       = document.getElementById('modeTrack');
 const modeViewport    = document.getElementById('modeViewport');
@@ -1499,12 +1500,12 @@ function renderSleepPanel() {
   }
 
   if (sleep.completed) {
+    // Panel content fades out via CSS; the wake button is body-level and
+    // animates in above the dim, so we just render the now-fading moon + label
     sleepPanel.innerHTML = `
       ${MOON_SVG}
       <div class="sleep-state-label">Asleep</div>
-      <button class="sleep-action-btn primary" type="button" id="sleepWakeBtn">Tap to wake</button>
     `;
-    sleepPanel.querySelector('#sleepWakeBtn').addEventListener('click', wakeUp);
     return;
   }
 
@@ -1745,6 +1746,10 @@ function cancelSleep() {
 sleepDim.addEventListener('click', () => {
   if (sleep.completed) wakeUp();
 });
+
+// Body-level wake button — single click handler, visibility is driven by
+// the body.sleep-complete class via CSS
+sleepWakeButton.addEventListener('click', wakeUp);
 
 // ---------- Theme picker ----------
 function applyTheme() {

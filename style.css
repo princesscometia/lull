@@ -1791,30 +1791,51 @@ body.sleep-complete .sleep-dim {
   cursor: pointer;
 }
 
-/* Wake button: when sleep cycle is complete, lift the primary button out
-   of the panel and center it on screen above the dim, with a soft fade-up
-   entrance and a gentle ongoing glow to draw the eye. */
-body.sleep-complete .sleep-action-btn.primary {
+/* Body-level wake button — sits truly above the dim so it's never
+   visually dimmed. The mode-track creates its own stacking context
+   (via transform), so a button rendered inside it can't escape — hence
+   keeping this one outside the .app entirely. */
+.sleep-wake-button {
   position: fixed;
   top: 50%;
   left: 50%;
   z-index: 110;
+  transform: translate(-50%, calc(-50% + 14px));
   opacity: 0;
-  /* Two animations: appear once, then glow forever */
-  animation:
-    wake-appear 1.4s cubic-bezier(0.4, 0, 0.2, 1) 0.5s forwards,
-    wake-glow 4s ease-in-out 2.0s infinite;
+  pointer-events: none;
+
+  background: linear-gradient(135deg, rgba(127, 209, 197, 0.32), rgba(168, 230, 220, 0.22));
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(168, 230, 220, 0.45);
+  color: var(--c-foam);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  padding: 14px 32px;
+  border-radius: 999px;
+  cursor: pointer;
+
+  /* Symmetric base transitions — IN gets the 0.5s settling delay below;
+     OUT (cancel/wake) reverts immediately so it doesn't feel sticky. */
+  transition:
+    opacity 1.4s cubic-bezier(0.4, 0, 0.2, 1),
+    transform 1.4s cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 0.25s ease,
+    background 0.25s ease;
 }
 
-@keyframes wake-appear {
-  0% {
-    opacity: 0;
-    transform: translate(-50%, calc(-50% + 14px));
-  }
-  100% {
-    opacity: 1;
-    transform: translate(-50%, -50%);
-  }
+.sleep-wake-button:hover {
+  background: linear-gradient(135deg, rgba(127, 209, 197, 0.45), rgba(168, 230, 220, 0.32));
+}
+
+body.sleep-complete .sleep-wake-button {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(-50%, -50%);
+  transition-delay: 0.5s; /* let the dim settle before the button surfaces */
+  animation: wake-glow 4s ease-in-out 2s infinite;
 }
 
 @keyframes wake-glow {
@@ -1828,6 +1849,16 @@ body.sleep-complete .sleep-action-btn.primary {
       0 6px 36px rgba(168, 230, 220, 0.55),
       0 0 0 8px rgba(168, 230, 220, 0.05);
   }
+}
+
+/* When the cycle finishes, fade out the panel content (moon + label) —
+   the wake button is the only thing left visible. */
+.sleep-panel-content {
+  transition: opacity 1.2s ease;
+}
+
+body.sleep-complete .sleep-panel-content {
+  opacity: 0;
 }
 
 /* Hidden by default; revealed in immersive mode */
