@@ -878,7 +878,7 @@ input[type="range"]::-moz-range-thumb {
 /* Hidden by default; revealed in immersive mode */
 .immersive-only {
   opacity: 0;
-  transition: opacity 1.2s ease;
+  transition: opacity 2.4s cubic-bezier(0.4, 0, 0.2, 1);
   pointer-events: none;
 }
 
@@ -888,7 +888,7 @@ body.immersive .immersive-only {
 
 /* ---------- Deepen background ---------- */
 body {
-  transition: background 1.2s ease;
+  transition: background 2.8s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 body.immersive {
@@ -905,7 +905,20 @@ body.immersive {
 .controls,
 .sound-card,
 .settings {
-  transition: opacity 0.8s ease, background 0.8s ease, box-shadow 0.8s ease, border-color 0.8s ease;
+  transition:
+    opacity      2.2s cubic-bezier(0.4, 0, 0.2, 1),
+    background   2.2s cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow   2.2s cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 2.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Cards wake-up on hover should snap a bit faster than fade-down so they feel responsive */
+body.immersive .sound-card:hover,
+body.immersive .sound-card:focus-within,
+body.immersive .settings:hover,
+body.immersive .settings:focus-within,
+body.immersive .header:hover {
+  transition: opacity 0.35s ease;
 }
 
 body.immersive .header {
@@ -934,6 +947,23 @@ body.immersive .header:hover {
 }
 
 /* ---------- Lift the timer into the spotlight ---------- */
+
+/* Smooth all the visual properties that change between modes */
+.time,
+.ring-progress,
+.ring-wave,
+.timer-ring,
+.caustics,
+.wave-1, .wave-2, .wave-3, .wave-4, .wave-5,
+.particles {
+  transition:
+    opacity         2.4s cubic-bezier(0.4, 0, 0.2, 1),
+    fill-opacity    2.4s cubic-bezier(0.4, 0, 0.2, 1),
+    text-shadow     2.4s cubic-bezier(0.4, 0, 0.2, 1),
+    filter          2.4s cubic-bezier(0.4, 0, 0.2, 1),
+    stroke-width    2.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
 body.immersive .timer-card {
   background: rgba(255, 255, 255, 0.07);
   border-color: rgba(168, 230, 220, 0.22);
