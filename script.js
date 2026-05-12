@@ -11,6 +11,7 @@ const resetBtn     = document.getElementById('resetBtn');
 const skipBtn      = document.getElementById('skipBtn');
 const sessionCount = document.getElementById('sessionCount');
 const ringProgress = document.querySelector('.ring-progress');
+const ringWaveEl   = document.getElementById('ringWave');
 const soundToggle  = document.getElementById('soundToggle');
 const soundLabel   = document.getElementById('soundLabel');
 const volumeSlider = document.getElementById('volume');
@@ -20,6 +21,14 @@ const breakInput   = document.getElementById('breakMin');
 
 // ---------- State ----------
 const RING_CIRCUMFERENCE = 678.58; // 2 * π * 108
+
+// Wave-line config (sinusoidal path just inside the ring)
+const WAVE_RADIUS    = 100;
+const WAVE_AMPLITUDE = 3.5;
+const WAVE_CYCLES    = 24;   // integer → path closes cleanly
+const WAVE_SEGMENTS  = 360;
+let   WAVE_LENGTH    = 0;    // measured after first build
+let   wavePhase      = 0;
 
 const STORAGE_KEY = 'lull-state-v1';
 
@@ -90,14 +99,43 @@ function render() {
   sessionCount.textContent = state.sessionsToday;
   startBtn.textContent = state.running ? 'Pause' : 'Start';
 
-  // Ring fills clockwise as time elapses
+  // Ring + wave fill clockwise as time elapses
   const elapsed = state.totalForPhase - state.remaining;
   const fraction = elapsed / state.totalForPhase;
-  const offset = RING_CIRCUMFERENCE * (1 - fraction);
-  ringProgress.style.strokeDashoffset = offset;
+  ringProgress.style.strokeDashoffset = RING_CIRCUMFERENCE * (1 - fraction);
+  ringWaveEl.style.strokeDashoffset   = WAVE_LENGTH * (1 - fraction);
 
   // Update document title so it's visible in a different tab
   document.title = `${formatTime(state.remaining)} · ${state.phase === 'focus' ? 'Focus' : 'Break'} — Lull`;
+}
+
+// ---------- Wave-line around the ring ----------
+function buildWavePath(phase) {
+  const cx = 120, cy = 120;
+  const parts = [];
+  for (let i = 0; i <= WAVE_SEGMENTS; i++) {
+    const t = i / WAVE_SEGMENTS;
+    const angle = t * Math.PI * 2;
+    const r = WAVE_RADIUS + WAVE_AMPLITUDE * Math.sin(WAVE_CYCLES * angle + phase);
+    const x = cx + r * Math.cos(angle);
+    const y = cy + r * Math.sin(angle);
+    parts.push(`${i === 0 ? 'M' : 'L'}${x.toFixed(2)},${y.toFixed(2)}`);
+  }
+  return parts.join(' ') + ' Z';
+}
+
+function initWave() {
+  ringWaveEl.setAttribute('d', buildWavePath(0));
+  WAVE_LENGTH = ringWaveEl.getTotalLength();
+  ringWaveEl.style.strokeDasharray = WAVE_LENGTH;
+  ringWaveEl.style.strokeDashoffset = WAVE_LENGTH; // start hidden
+}
+
+function animateWave() {
+  // Slow phase drift → waves appear to travel gently around the ring
+  wavePhase += 0.012;
+  ringWaveEl.setAttribute('d', buildWavePath(wavePhase));
+  requestAnimationFrame(animateWave);
 }
 
 // ---------- Timer ----------
@@ -446,5 +484,7 @@ document.addEventListener('keydown', (e) => {
 
 // ---------- Init ----------
 loadState();
+initWave();
 render();
+animateWave();
 volValue.textContent = volumeSlider.value;

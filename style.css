@@ -263,6 +263,17 @@ body {
   transition: stroke-dashoffset 1s linear;
 }
 
+.ring-wave {
+  fill: none;
+  stroke: url(#waveGradient);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-dashoffset: 0;
+  transition: stroke-dashoffset 1s linear;
+  filter: drop-shadow(0 0 6px rgba(168, 230, 220, 0.45));
+  opacity: 0.9;
+}
+
 .timer-display {
   position: absolute;
   inset: 0;
