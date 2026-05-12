@@ -72,12 +72,26 @@ function todayKey() {
 }
 
 // ---------- Soundscape state ----------
-const soundState = {
-  waves:      { active: false, volume: 60 },
-  rain:       { active: false, volume: 50 },
-  underwater: { active: false, volume: 55 },
-  thunder:    { active: false, volume: 45 },
+// Each tab has its own independent mix. activeMixContext determines which
+// state is currently producing audio; switching tabs fades one mix out and
+// brings the other in.
+const soundStates = {
+  focus: {
+    waves:      { active: false, volume: 60 },
+    rain:       { active: false, volume: 50 },
+    underwater: { active: false, volume: 55 },
+    thunder:    { active: false, volume: 45 },
+  },
+  sleep: {
+    waves:      { active: false, volume: 40 },
+    rain:       { active: false, volume: 55 },
+    underwater: { active: false, volume: 50 },
+    thunder:    { active: false, volume: 30 },
+  },
 };
+
+let activeMixContext = 'focus';
+let soundState = soundStates.focus; // pointer that all the existing code reads
 
 let masterVolume = 50;
 // Chime volume is a 0-100 slider scaled to a max gain of 0.08 (the previous
@@ -132,9 +146,22 @@ function loadState() {
     if (typeof saved.chimeVolume === 'number')  chimeVolume  = saved.chimeVolume;
     if (typeof saved.immersiveMode === 'boolean') immersiveMode = saved.immersiveMode;
     if (typeof saved.theme === 'string') currentTheme = saved.theme;
-    if (saved.soundVolumes) {
+    // New format: per-context state (focus + sleep)
+    if (saved.soundStates) {
+      ['focus', 'sleep'].forEach(ctx => {
+        const ctxSaved = saved.soundStates[ctx];
+        if (!ctxSaved) return;
+        Object.entries(ctxSaved).forEach(([k, v]) => {
+          if (soundStates[ctx][k] && typeof v?.volume === 'number') {
+            soundStates[ctx][k].volume = v.volume;
+          }
+          // active flag is intentionally NOT restored — fresh silence each session
+        });
+      });
+    } else if (saved.soundVolumes) {
+      // Backwards compat: pre-per-context format → apply to focus only
       Object.entries(saved.soundVolumes).forEach(([k, v]) => {
-        if (soundState[k] && typeof v === 'number') soundState[k].volume = v;
+        if (soundStates.focus[k] && typeof v === 'number') soundStates.focus[k].volume = v;
       });
     }
 
@@ -157,9 +184,10 @@ function saveState() {
     chimeVolume,
     immersiveMode,
     theme: currentTheme,
-    soundVolumes: Object.fromEntries(
-      Object.entries(soundState).map(([k, v]) => [k, v.volume])
-    ),
+    soundStates: {
+      focus: Object.fromEntries(Object.entries(soundStates.focus).map(([k, v]) => [k, { volume: v.volume }])),
+      sleep: Object.fromEntries(Object.entries(soundStates.sleep).map(([k, v]) => [k, { volume: v.volume }])),
+    },
   };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
 }
@@ -214,20 +242,27 @@ function render() {
 }
 
 function renderSoundUI() {
-  Object.keys(soundState).forEach(id => {
-    const row = document.querySelector(`.mixer-row[data-sound="${id}"]`);
-    if (!row) return;
+  // Render both context mixers from their respective states.
+  // Each .mixer-row has data-context so we know which state to read from.
+  document.querySelectorAll('.mixer-row').forEach(row => {
+    const id = row.dataset.sound;
+    const ctx = row.dataset.context || 'focus';
+    const state = soundStates[ctx]?.[id];
+    if (!state) return;
     const toggleBtn = row.querySelector('.sound-row-toggle');
-    toggleBtn.classList.toggle('active', soundState[id].active);
+    toggleBtn.classList.toggle('active', state.active);
     const slider = row.querySelector('.sound-volume');
-    if (parseInt(slider.value, 10) !== soundState[id].volume) {
-      slider.value = soundState[id].volume;
+    if (parseInt(slider.value, 10) !== state.volume) {
+      slider.value = state.volume;
     }
   });
-  if (parseInt(masterSlider.value, 10) !== masterVolume) {
-    masterSlider.value = masterVolume;
-  }
-  volValue.textContent = masterVolume;
+  // Sync the master sliders in each mixer
+  document.querySelectorAll('.master-row input[type="range"]').forEach(sl => {
+    if (parseInt(sl.value, 10) !== masterVolume) sl.value = masterVolume;
+  });
+  document.querySelectorAll('.vol-value').forEach(el => {
+    el.textContent = masterVolume;
+  });
 }
 
 // ---------- Wave-line around the ring ----------
@@ -701,7 +736,10 @@ const soundFactories = {
 };
 
 // ---------- Mixer control ----------
-function activateSound(id) {
+// Audio-only helpers (don't touch state .active flags). Used by both the
+// state+audio activate/deactivate functions AND by switchAudioContext when
+// crossing between Focus and Sleep contexts.
+function startSoundAudio(id) {
   ensureAudioContext();
   if (audioCtx.state === 'suspended') audioCtx.resume();
   if (activeNodes[id]) return;
@@ -709,7 +747,6 @@ function activateSound(id) {
   const factory = soundFactories[id];
   if (!factory) return;
 
-  const wasEmpty = Object.keys(activeNodes).length === 0;
   const nodes = factory(audioCtx, masterGain);
   activeNodes[id] = nodes;
 
@@ -718,20 +755,12 @@ function activateSound(id) {
   nodes.bus.gain.cancelScheduledValues(now);
   nodes.bus.gain.setValueAtTime(0, now);
   nodes.bus.gain.linearRampToValueAtTime(target, now + 1.5);
-
-  soundState[id].active = true;
-  if (wasEmpty) mixLinkedToTimer = state.running;
-
-  saveState();
 }
 
-function deactivateSound(id) {
+function stopSoundAudio(id) {
   const nodes = activeNodes[id];
   if (!nodes) return;
-
-  // Mark inactive immediately so re-activation sees fresh state.
   delete activeNodes[id];
-  soundState[id].active = false;
 
   const now = audioCtx.currentTime;
   nodes.bus.gain.cancelScheduledValues(now);
@@ -744,9 +773,46 @@ function deactivateSound(id) {
       if (nodes.cleanup) nodes.cleanup();
     } catch (e) {}
   }, 1100);
+}
 
-  if (Object.keys(activeNodes).length === 0) mixLinkedToTimer = false;
+function activateSound(id) {
+  if (!soundState[id]) return;
+  const wasEmpty = !anySoundActive();
+  soundState[id].active = true;
+  startSoundAudio(id);
+  if (wasEmpty) mixLinkedToTimer = state.running;
   saveState();
+}
+
+function deactivateSound(id) {
+  if (!soundState[id]) return;
+  soundState[id].active = false;
+  stopSoundAudio(id);
+  if (!anySoundActive()) mixLinkedToTimer = false;
+  saveState();
+}
+
+// Switch which mix context is producing audio. Stops sounds from the old
+// context (without changing its .active flags) and starts the new context's
+// active sounds. Called from switchMode when tabs change.
+function switchAudioContext(newCtx) {
+  if (activeMixContext === newCtx) return;
+
+  // Stop currently playing sounds (don't mutate state flags — they belong to
+  // the old context's persistent config)
+  Object.keys(activeNodes).forEach(id => stopSoundAudio(id));
+
+  // Switch the context pointer
+  activeMixContext = newCtx;
+  soundState = soundStates[newCtx];
+
+  // Start audio for any sounds the new context has marked active
+  Object.entries(soundState).forEach(([id, s]) => {
+    if (s.active) startSoundAudio(id);
+  });
+
+  // Linked-to-timer is per-mix-session; reset on context switch
+  mixLinkedToTimer = false;
 }
 
 function toggleSoundById(id) {
@@ -1122,26 +1188,53 @@ startBtn.addEventListener('click', () => {
 resetBtn.addEventListener('click', reset);
 skipBtn.addEventListener('click', skip);
 
-document.querySelectorAll('.sound-row-toggle').forEach(btn => {
-  btn.addEventListener('click', () => {
-    const row = btn.closest('.mixer-row');
-    if (!row) return;
-    toggleSoundById(row.dataset.sound);
-    noteMixDirtied();
-  });
+// Delegated handler: works for both Focus and Sleep mixers, including the
+// Sleep mixer which is rendered dynamically into the Sleep panel.
+document.addEventListener('click', (e) => {
+  const toggleBtn = e.target.closest('.sound-row-toggle');
+  if (!toggleBtn) return;
+  const row = toggleBtn.closest('.mixer-row');
+  if (!row) return;
+  const ctx = row.dataset.context || 'focus';
+  // If user is interacting with a mixer for a context that isn't active, switch
+  // contexts first so the toggle actually plays audio
+  if (ctx !== activeMixContext) switchAudioContext(ctx);
+  toggleSoundById(row.dataset.sound);
+  // Presets live on the Focus tab; only Focus interactions should dirty the highlight
+  if (ctx === 'focus') noteMixDirtied();
+  renderSoundUI();
 });
 
-document.querySelectorAll('.sound-volume').forEach(slider => {
-  slider.addEventListener('input', (e) => {
-    const id = e.target.dataset.sound;
-    setSoundVolume(id, parseInt(e.target.value, 10));
+document.addEventListener('input', (e) => {
+  const slider = e.target.closest('.sound-volume');
+  if (slider) {
+    const ctx = slider.dataset.context || 'focus';
+    const id = slider.dataset.sound;
+    const v = parseInt(slider.value, 10);
+    if (soundStates[ctx]?.[id]) {
+      soundStates[ctx][id].volume = v;
+      if (ctx === activeMixContext) {
+        const nodes = activeNodes[id];
+        if (nodes && audioCtx) {
+          nodes.bus.gain.setTargetAtTime(v / 100, audioCtx.currentTime, 0.05);
+        }
+      }
+      saveState();
+    }
+    if (ctx === 'focus') noteMixDirtied();
+    return;
+  }
+  // Master volume sliders (both Focus and Sleep panels carry one)
+  if (e.target.matches('.master-row input[type="range"]')) {
+    const v = parseInt(e.target.value, 10);
+    setMasterVolume(v);
+    // Sync the OTHER master slider so they stay in lockstep
+    document.querySelectorAll('.master-row input[type="range"]').forEach(sl => {
+      if (sl !== e.target && parseInt(sl.value, 10) !== v) sl.value = v;
+    });
+    document.querySelectorAll('.vol-value').forEach(el => { el.textContent = v; });
     noteMixDirtied();
-  });
-});
-
-masterSlider.addEventListener('input', (e) => {
-  setMasterVolume(parseInt(e.target.value, 10));
-  noteMixDirtied();
+  }
 });
 
 // ---------- Save preset flow ----------
@@ -1270,12 +1363,19 @@ let currentMode = 'focus'; // 'focus' | 'sleep'
 function switchMode(mode) {
   if (currentMode === mode) return;
   currentMode = mode;
+
+  // Swap audio context so the new tab's mix becomes the audible one
+  switchAudioContext(mode);
+
   modeTrack.classList.toggle('show-sleep', mode === 'sleep');
   modeTabs.forEach(tab => {
     const isActive = tab.dataset.mode === mode;
     tab.classList.toggle('active', isActive);
     tab.setAttribute('aria-selected', String(isActive));
   });
+
+  // Re-render both mixer UIs so each shows its context's persistent state
+  renderSoundUI();
   if (mode === 'sleep') renderSleepPanel();
 }
 
@@ -1408,18 +1508,77 @@ function renderSleepPanel() {
     return;
   }
 
-  // Idle state — duration cards, active sounds, and the sleep stats block
+  // Idle state — duration cards, Sleep's own mixer, then the sleep stats block
+  const s = soundStates.sleep;
   sleepPanel.innerHTML = `
     ${MOON_SVG}
     <h2 class="sleep-headline">Drift off gently</h2>
-    <p class="sleep-blurb">Your active sounds will fade smoothly to silence over the time you choose. Pick a duration to begin.</p>
+    <p class="sleep-blurb">Pick a duration and your sleep mix will fade smoothly to silence over that time.</p>
     <div class="sleep-durations">
       <button class="sleep-duration-card" type="button" data-min="15"><span class="num">15</span><span class="unit">min</span></button>
       <button class="sleep-duration-card" type="button" data-min="30"><span class="num">30</span><span class="unit">min</span></button>
       <button class="sleep-duration-card" type="button" data-min="45"><span class="num">45</span><span class="unit">min</span></button>
       <button class="sleep-duration-card" type="button" data-min="60"><span class="num">60</span><span class="unit">min</span></button>
     </div>
-    <div class="sleep-active-sounds" id="sleepActiveSoundsWrap"></div>
+
+    <div class="sleep-mixer-section">
+      <div class="sleep-section-title">Sleep sound mix</div>
+      <div class="mixer">
+        <div class="mixer-row" data-sound="waves" data-context="sleep">
+          <button class="sound-row-toggle ${s.waves.active ? 'active' : ''}" aria-label="Toggle Ocean Waves">
+            <span class="sound-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="18" height="18">
+                <path d="M2 11c2-2.5 4-2.5 6 0s4 2.5 6 0 4-2.5 6 0" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+                <path d="M2 16c2-2.5 4-2.5 6 0s4 2.5 6 0 4-2.5 6 0" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.5"/>
+              </svg>
+            </span>
+            <span class="sound-name">Ocean Waves</span>
+          </button>
+          <input type="range" class="sound-volume" data-sound="waves" data-context="sleep" min="0" max="100" value="${s.waves.volume}" aria-label="Ocean Waves volume" />
+        </div>
+        <div class="mixer-row" data-sound="rain" data-context="sleep">
+          <button class="sound-row-toggle ${s.rain.active ? 'active' : ''}" aria-label="Toggle Rain on Water">
+            <span class="sound-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="18" height="18">
+                <path d="M6 4l-2 8M11 5l-2 8M16 4l-2 8M21 5l-2 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+              </svg>
+            </span>
+            <span class="sound-name">Rain on Water</span>
+          </button>
+          <input type="range" class="sound-volume" data-sound="rain" data-context="sleep" min="0" max="100" value="${s.rain.volume}" aria-label="Rain volume" />
+        </div>
+        <div class="mixer-row" data-sound="underwater" data-context="sleep">
+          <button class="sound-row-toggle ${s.underwater.active ? 'active' : ''}" aria-label="Toggle Underwater">
+            <span class="sound-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="18" height="18">
+                <circle cx="6" cy="9" r="1.5" stroke="currentColor" stroke-width="1.3" fill="none"/>
+                <circle cx="14" cy="13" r="2.2" stroke="currentColor" stroke-width="1.3" fill="none"/>
+                <circle cx="19" cy="7" r="1" stroke="currentColor" stroke-width="1.3" fill="none"/>
+                <circle cx="10" cy="18" r="0.9" stroke="currentColor" stroke-width="1.3" fill="none"/>
+              </svg>
+            </span>
+            <span class="sound-name">Underwater</span>
+          </button>
+          <input type="range" class="sound-volume" data-sound="underwater" data-context="sleep" min="0" max="100" value="${s.underwater.volume}" aria-label="Underwater volume" />
+        </div>
+        <div class="mixer-row" data-sound="thunder" data-context="sleep">
+          <button class="sound-row-toggle ${s.thunder.active ? 'active' : ''}" aria-label="Toggle Soft Thunder">
+            <span class="sound-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="18" height="18">
+                <path d="M13 2L5 14h5l-2 8 11-13h-6l1-7z" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </span>
+            <span class="sound-name">Soft Thunder</span>
+          </button>
+          <input type="range" class="sound-volume" data-sound="thunder" data-context="sleep" min="0" max="100" value="${s.thunder.volume}" aria-label="Thunder volume" />
+        </div>
+      </div>
+      <div class="master-row">
+        <span class="master-label">Master</span>
+        <input type="range" min="0" max="100" value="${masterVolume}" aria-label="Master volume" />
+        <span class="vol-value">${masterVolume}</span>
+      </div>
+    </div>
 
     <div class="sleep-stats-block" id="sleepStatsBlock">
       <div class="sleep-stats-header">
@@ -1450,7 +1609,6 @@ function renderSleepPanel() {
   sleepPanel.querySelectorAll('.sleep-duration-card').forEach(card => {
     card.addEventListener('click', () => startSleep(parseInt(card.dataset.min, 10)));
   });
-  renderSleepActiveSounds();
   renderSleepStats();
 }
 
@@ -1485,29 +1643,6 @@ function renderSleepStats() {
   const total = getAllTimeTotals('sleep');
   document.getElementById('sleepStatsAllSessions').textContent = total.sessions;
   document.getElementById('sleepStatsAllMinutes').textContent  = formatMinutes(total.minutes);
-}
-
-const SOUND_LABELS = {
-  waves: 'Ocean Waves',
-  rain: 'Light Rain',
-  underwater: 'Underwater',
-  thunder: 'Soft Thunder',
-};
-
-function renderSleepActiveSounds() {
-  const wrap = document.getElementById('sleepActiveSoundsWrap');
-  if (!wrap) return;
-  const active = Object.entries(soundState).filter(([, s]) => s.active).map(([id]) => id);
-  if (active.length === 0) {
-    wrap.innerHTML = `<div class="sleep-no-sounds">No sounds active — pick some on the Focus tab first.</div>`;
-  } else {
-    wrap.innerHTML = `
-      <div class="sleep-active-label">Active sounds (${active.length})</div>
-      <div class="sleep-active-list">
-        ${active.map(id => `<span class="sleep-active-pill">${SOUND_LABELS[id] || id}</span>`).join('')}
-      </div>
-    `;
-  }
 }
 
 function startSleep(minutes) {
