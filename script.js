@@ -443,25 +443,27 @@ function createRain(ctx, dest) {
   bus.gain.value = 0;
   bus.connect(dest);
 
-  // Light pitter-patter: high-band white noise, narrower and quieter than a downpour
+  // Soft pitter-patter: narrow mid-band white noise.
+  // Upper cutoff sits below the "harsh" 3-6kHz presence range, so the rain
+  // feels gentle rather than hissy.
   const white = makeWhiteNoiseSource(ctx);
   const hp = ctx.createBiquadFilter();
-  hp.type = 'highpass'; hp.frequency.value = 900;
+  hp.type = 'highpass'; hp.frequency.value = 850;
   const lp = ctx.createBiquadFilter();
-  lp.type = 'lowpass';  lp.frequency.value = 5500;
-  const whiteGain = ctx.createGain(); whiteGain.gain.value = 0.28;
+  lp.type = 'lowpass';  lp.frequency.value = 3200;
+  const whiteGain = ctx.createGain(); whiteGain.gain.value = 0.18;
   white.connect(hp); hp.connect(lp); lp.connect(whiteGain); whiteGain.connect(bus);
 
   // Very subtle surface presence — just enough to feel like rain on water, not heavy
   const brown = makeBrownNoiseSource(ctx);
   const brownLP = ctx.createBiquadFilter();
   brownLP.type = 'lowpass'; brownLP.frequency.value = 200;
-  const brownGain = ctx.createGain(); brownGain.gain.value = 0.08;
+  const brownGain = ctx.createGain(); brownGain.gain.value = 0.06;
   brown.connect(brownLP); brownLP.connect(brownGain); brownGain.connect(bus);
 
   // Gentle ebb so it doesn't feel static
   const lfo = ctx.createOscillator(); lfo.frequency.value = 0.06;
-  const lfoDepth = ctx.createGain();  lfoDepth.gain.value = 0.07;
+  const lfoDepth = ctx.createGain();  lfoDepth.gain.value = 0.05;
   lfo.connect(lfoDepth); lfoDepth.connect(whiteGain.gain);
 
   brown.start(); white.start(); lfo.start();
