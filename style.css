@@ -229,8 +229,136 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 28px;
+  gap: 24px;
 }
+
+/* =========================================================
+   DURATION CONTROLS (above the ring)
+   ========================================================= */
+
+.duration-row {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 4px 0 8px;
+}
+
+.duration-divider {
+  width: 1px;
+  height: 50px;
+  background: linear-gradient(180deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.18) 50%,
+    transparent 100%);
+}
+
+.duration-control {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 16px;
+  border-radius: 14px;
+  cursor: ns-resize;
+  transition: background 0.25s ease, transform 0.15s ease;
+  outline: none;
+  user-select: none;
+}
+
+.duration-control:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.duration-control:focus-visible {
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 0 0 1px rgba(168, 230, 220, 0.3);
+}
+
+.duration-control.disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.duration-label {
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--c-text-faint);
+  font-weight: 500;
+  transition: color 0.3s ease;
+}
+
+.duration-control.active .duration-label {
+  color: var(--c-aqua);
+}
+
+.duration-wheel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  position: relative;
+}
+
+.wheel-arrow {
+  background: transparent;
+  border: none;
+  color: var(--c-text-faint);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1;
+  padding: 6px;
+  cursor: pointer;
+  opacity: 0.4;
+  transition: opacity 0.2s ease, color 0.2s ease, transform 0.1s ease;
+  font-family: var(--font-body);
+}
+
+.duration-control:hover .wheel-arrow,
+.duration-control:focus-visible .wheel-arrow {
+  opacity: 0.7;
+}
+
+.wheel-arrow:hover {
+  opacity: 1;
+  color: var(--c-foam);
+}
+
+.wheel-arrow:active {
+  transform: scale(0.85);
+}
+
+.duration-number {
+  font-family: var(--font-display);
+  font-weight: 300;
+  font-size: 36px;
+  line-height: 1;
+  color: var(--c-foam);
+  font-variant-numeric: tabular-nums;
+  min-width: 48px;
+  text-align: center;
+  transition: color 0.3s ease, text-shadow 0.3s ease, transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.duration-control.active .duration-number {
+  text-shadow: 0 0 16px rgba(168, 230, 220, 0.4);
+}
+
+.duration-number.bump {
+  transform: scale(1.12);
+}
+
+.duration-unit {
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--c-text-faint);
+  font-weight: 500;
+}
+
+
 
 .timer-ring-wrap {
   position: relative;

@@ -31,6 +31,30 @@
 
     <!-- Timer -->
     <section class="timer-card glass">
+      <div class="duration-row">
+        <div class="duration-control" data-phase="focus" tabindex="0" role="spinbutton" aria-label="Focus duration in minutes" aria-valuemin="1" aria-valuemax="120" aria-valuenow="25">
+          <span class="duration-label">Focus</span>
+          <div class="duration-wheel">
+            <button class="wheel-arrow up" data-dir="up" aria-label="Increase focus duration">⌃</button>
+            <span class="duration-number" id="focusDuration">25</span>
+            <button class="wheel-arrow down" data-dir="down" aria-label="Decrease focus duration">⌄</button>
+          </div>
+          <span class="duration-unit">min</span>
+        </div>
+
+        <div class="duration-divider" aria-hidden="true"></div>
+
+        <div class="duration-control" data-phase="break" tabindex="0" role="spinbutton" aria-label="Break duration in minutes" aria-valuemin="1" aria-valuemax="60" aria-valuenow="5">
+          <span class="duration-label">Break</span>
+          <div class="duration-wheel">
+            <button class="wheel-arrow up" data-dir="up" aria-label="Increase break duration">⌃</button>
+            <span class="duration-number" id="breakDuration">5</span>
+            <button class="wheel-arrow down" data-dir="down" aria-label="Decrease break duration">⌄</button>
+          </div>
+          <span class="duration-unit">min</span>
+        </div>
+      </div>
+
       <div class="timer-ring-wrap">
         <svg class="timer-ring" viewBox="0 0 240 240">
           <defs>
@@ -135,14 +159,6 @@
     <!-- Settings (subtle, collapsed) -->
     <details class="settings glass-subtle">
       <summary>Settings</summary>
-      <div class="setting-row">
-        <label for="workMin">Focus length (min)</label>
-        <input type="number" id="workMin" min="1" max="120" value="25" />
-      </div>
-      <div class="setting-row">
-        <label for="breakMin">Break length (min)</label>
-        <input type="number" id="breakMin" min="1" max="60" value="5" />
-      </div>
       <div class="setting-row">
         <label for="chimeVolume">Chime volume</label>
         <div class="setting-slider-group">

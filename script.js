@@ -14,8 +14,9 @@ const ringProgress = document.querySelector('.ring-progress');
 const ringWaveEl   = document.getElementById('ringWave');
 const masterSlider = document.getElementById('masterVolume');
 const volValue     = document.getElementById('volValue');
-const workInput    = document.getElementById('workMin');
-const breakInput   = document.getElementById('breakMin');
+const focusDurEl   = document.getElementById('focusDuration');
+const breakDurEl   = document.getElementById('breakDuration');
+const durationControls = document.querySelectorAll('.duration-control');
 const chimeSlider  = document.getElementById('chimeVolume');
 const chimeValueEl = document.getElementById('chimeVolumeValue');
 
@@ -91,9 +92,9 @@ function loadState() {
       });
     }
 
-    workInput.value  = state.workMin;
-    breakInput.value = state.breakMin;
-    chimeSlider.value  = chimeVolume;
+    focusDurEl.textContent = state.workMin;
+    breakDurEl.textContent = state.breakMin;
+    chimeSlider.value      = chimeVolume;
     chimeValueEl.textContent = chimeVolume;
     state.remaining     = state.workMin * 60;
     state.totalForPhase = state.workMin * 60;
@@ -132,6 +133,12 @@ function render() {
   const fraction = elapsed / state.totalForPhase;
   ringProgress.style.strokeDashoffset = RING_CIRCUMFERENCE * (1 - fraction);
   ringWaveEl.style.strokeDashoffset   = WAVE_LENGTH * (1 - fraction);
+
+  // Duration controls: highlight current phase, disable while running
+  durationControls.forEach(c => {
+    c.classList.toggle('active', c.dataset.phase === state.phase);
+    c.classList.toggle('disabled', state.running);
+  });
 
   document.title = `${formatTime(state.remaining)} · ${state.phase === 'focus' ? 'Focus' : 'Break'} — Lull`;
 }
@@ -778,28 +785,79 @@ masterSlider.addEventListener('input', (e) => {
   setMasterVolume(parseInt(e.target.value, 10));
 });
 
-workInput.addEventListener('change', (e) => {
-  const v = Math.max(1, Math.min(120, parseInt(e.target.value, 10) || 25));
-  state.workMin = v;
-  workInput.value = v;
-  if (state.phase === 'focus' && !state.running) {
-    state.remaining = v * 60;
-    state.totalForPhase = v * 60;
-    render();
-  }
-  saveState();
-});
+// ---------- Duration controls (wheel / click / keyboard) ----------
+function adjustDuration(phase, delta) {
+  if (state.running) return; // can't change mid-session
 
-breakInput.addEventListener('change', (e) => {
-  const v = Math.max(1, Math.min(60, parseInt(e.target.value, 10) || 5));
-  state.breakMin = v;
-  breakInput.value = v;
-  if (state.phase === 'break' && !state.running) {
-    state.remaining = v * 60;
-    state.totalForPhase = v * 60;
-    render();
+  if (phase === 'focus') {
+    const v = Math.max(1, Math.min(120, state.workMin + delta));
+    if (v === state.workMin) return;
+    state.workMin = v;
+    focusDurEl.textContent = v;
+    focusDurEl.closest('.duration-control').setAttribute('aria-valuenow', v);
+    if (state.phase === 'focus') {
+      state.remaining = v * 60;
+      state.totalForPhase = v * 60;
+      render();
+    }
+    bumpNumber(focusDurEl);
+  } else {
+    const v = Math.max(1, Math.min(60, state.breakMin + delta));
+    if (v === state.breakMin) return;
+    state.breakMin = v;
+    breakDurEl.textContent = v;
+    breakDurEl.closest('.duration-control').setAttribute('aria-valuenow', v);
+    if (state.phase === 'break') {
+      state.remaining = v * 60;
+      state.totalForPhase = v * 60;
+      render();
+    }
+    bumpNumber(breakDurEl);
   }
   saveState();
+}
+
+function bumpNumber(el) {
+  el.classList.remove('bump');
+  // Force reflow so the animation restarts cleanly on rapid changes
+  void el.offsetWidth;
+  el.classList.add('bump');
+  setTimeout(() => el.classList.remove('bump'), 180);
+}
+
+durationControls.forEach(control => {
+  const phase = control.dataset.phase;
+
+  // Mouse wheel — accumulate so the control isn't twitchy on high-DPI trackpads
+  let wheelAccum = 0;
+  control.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    if (state.running) return;
+    wheelAccum += e.deltaY;
+    if (Math.abs(wheelAccum) >= 24) {
+      adjustDuration(phase, wheelAccum > 0 ? -1 : 1);
+      wheelAccum = 0;
+    }
+  }, { passive: false });
+
+  // Chevron click
+  control.querySelectorAll('.wheel-arrow').forEach(arrow => {
+    arrow.addEventListener('click', (e) => {
+      e.stopPropagation();
+      adjustDuration(phase, arrow.dataset.dir === 'up' ? 1 : -1);
+    });
+  });
+
+  // Keyboard when focused: arrows = ±1, shift+arrows = ±5
+  control.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowUp' || e.key === 'ArrowRight') {
+      e.preventDefault();
+      adjustDuration(phase, e.shiftKey ? 5 : 1);
+    } else if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') {
+      e.preventDefault();
+      adjustDuration(phase, e.shiftKey ? -5 : -1);
+    }
+  });
 });
 
 chimeSlider.addEventListener('input', (e) => {
