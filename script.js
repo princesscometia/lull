@@ -1,6 +1,6 @@
 /* =========================================================
    LULL — script.js
-   Timer logic + synthesized ocean wave audio
+   Timer + mixer engine (Web Audio synthesized soundscapes)
    ========================================================= */
 
 // ---------- DOM ----------
@@ -12,9 +12,7 @@ const skipBtn      = document.getElementById('skipBtn');
 const sessionCount = document.getElementById('sessionCount');
 const ringProgress = document.querySelector('.ring-progress');
 const ringWaveEl   = document.getElementById('ringWave');
-const soundToggle  = document.getElementById('soundToggle');
-const soundLabel   = document.getElementById('soundLabel');
-const volumeSlider = document.getElementById('volume');
+const masterSlider = document.getElementById('masterVolume');
 const volValue     = document.getElementById('volValue');
 const workInput    = document.getElementById('workMin');
 const breakInput   = document.getElementById('breakMin');
@@ -23,20 +21,20 @@ const breakInput   = document.getElementById('breakMin');
 const RING_CIRCUMFERENCE = 678.58; // 2 * π * 108
 
 // Wave-line config (sinusoidal path weaving through the ring)
-const WAVE_RADIUS    = 108;  // same mean radius as the ring → wave crosses through it
+const WAVE_RADIUS    = 108;
 const WAVE_AMPLITUDE = 5;
-const WAVE_CYCLES    = 24;   // integer → path closes cleanly
+const WAVE_CYCLES    = 24;
 const WAVE_SEGMENTS  = 360;
-let   WAVE_LENGTH    = 0;    // measured after first build
+let   WAVE_LENGTH    = 0;
 let   wavePhase      = 0;
 
 const STORAGE_KEY = 'lull-state-v1';
 
 const state = {
-  phase: 'focus',          // 'focus' | 'break'
+  phase: 'focus',
   running: false,
-  remaining: 25 * 60,      // seconds left in current phase
-  totalForPhase: 25 * 60,  // for ring math
+  remaining: 25 * 60,
+  totalForPhase: 25 * 60,
   workMin: 25,
   breakMin: 5,
   sessionsToday: 0,
@@ -49,6 +47,20 @@ function todayKey() {
   return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
 }
 
+// ---------- Soundscape state ----------
+const soundState = {
+  waves:      { active: false, volume: 60 },
+  rain:       { active: false, volume: 50 },
+  underwater: { active: false, volume: 55 },
+  thunder:    { active: false, volume: 45 },
+};
+
+let masterVolume = 50;
+// Smart hybrid: linked if the first sound was started while a timer was running.
+// Independent if the user started a mix while idle (pure ambience).
+let mixLinkedToTimer = false;
+const activeNodes = {};
+
 // ---------- Persistence ----------
 function loadState() {
   try {
@@ -56,7 +68,6 @@ function loadState() {
     if (!raw) return;
     const saved = JSON.parse(raw);
 
-    // Reset session count if day rolled over
     if (saved.lastDate !== todayKey()) {
       saved.sessionsToday = 0;
       saved.lastDate = todayKey();
@@ -67,13 +78,18 @@ function loadState() {
     state.sessionsToday = saved.sessionsToday ?? 0;
     state.lastDate      = saved.lastDate;
 
+    if (typeof saved.masterVolume === 'number') masterVolume = saved.masterVolume;
+    if (saved.soundVolumes) {
+      Object.entries(saved.soundVolumes).forEach(([k, v]) => {
+        if (soundState[k] && typeof v === 'number') soundState[k].volume = v;
+      });
+    }
+
     workInput.value  = state.workMin;
     breakInput.value = state.breakMin;
     state.remaining     = state.workMin * 60;
     state.totalForPhase = state.workMin * 60;
-  } catch (e) {
-    // ignore corrupt storage
-  }
+  } catch (e) {}
 }
 
 function saveState() {
@@ -82,6 +98,10 @@ function saveState() {
     breakMin: state.breakMin,
     sessionsToday: state.sessionsToday,
     lastDate: state.lastDate,
+    masterVolume,
+    soundVolumes: Object.fromEntries(
+      Object.entries(soundState).map(([k, v]) => [k, v.volume])
+    ),
   };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
 }
@@ -99,14 +119,29 @@ function render() {
   sessionCount.textContent = state.sessionsToday;
   startBtn.textContent = state.running ? 'Pause' : 'Start';
 
-  // Ring + wave fill clockwise as time elapses
   const elapsed = state.totalForPhase - state.remaining;
   const fraction = elapsed / state.totalForPhase;
   ringProgress.style.strokeDashoffset = RING_CIRCUMFERENCE * (1 - fraction);
   ringWaveEl.style.strokeDashoffset   = WAVE_LENGTH * (1 - fraction);
 
-  // Update document title so it's visible in a different tab
   document.title = `${formatTime(state.remaining)} · ${state.phase === 'focus' ? 'Focus' : 'Break'} — Lull`;
+}
+
+function renderSoundUI() {
+  Object.keys(soundState).forEach(id => {
+    const row = document.querySelector(`.mixer-row[data-sound="${id}"]`);
+    if (!row) return;
+    const toggleBtn = row.querySelector('.sound-row-toggle');
+    toggleBtn.classList.toggle('active', soundState[id].active);
+    const slider = row.querySelector('.sound-volume');
+    if (parseInt(slider.value, 10) !== soundState[id].volume) {
+      slider.value = soundState[id].volume;
+    }
+  });
+  if (parseInt(masterSlider.value, 10) !== masterVolume) {
+    masterSlider.value = masterVolume;
+  }
+  volValue.textContent = masterVolume;
 }
 
 // ---------- Wave-line around the ring ----------
@@ -128,17 +163,20 @@ function initWave() {
   ringWaveEl.setAttribute('d', buildWavePath(0));
   WAVE_LENGTH = ringWaveEl.getTotalLength();
   ringWaveEl.style.strokeDasharray = WAVE_LENGTH;
-  ringWaveEl.style.strokeDashoffset = WAVE_LENGTH; // start hidden
+  ringWaveEl.style.strokeDashoffset = WAVE_LENGTH;
 }
 
 function animateWave() {
-  // Slow phase drift → waves appear to travel gently around the ring
   wavePhase += 0.012;
   ringWaveEl.setAttribute('d', buildWavePath(wavePhase));
   requestAnimationFrame(animateWave);
 }
 
 // ---------- Timer ----------
+function anySoundActive() {
+  return Object.values(soundState).some(s => s.active);
+}
+
 function tick() {
   if (state.remaining <= 0) {
     completePhase();
@@ -152,7 +190,7 @@ function start() {
   if (state.running) return;
   state.running = true;
   state.intervalId = setInterval(tick, 1000);
-  if (soundOn && soundLinkedToTimer) unduckSound();
+  if (anySoundActive() && mixLinkedToTimer) unduckMix();
   render();
 }
 
@@ -161,7 +199,7 @@ function pause() {
   state.running = false;
   clearInterval(state.intervalId);
   state.intervalId = null;
-  if (soundOn && soundLinkedToTimer) duckSound();
+  if (anySoundActive() && mixLinkedToTimer) duckMix();
   render();
 }
 
@@ -172,19 +210,16 @@ function toggleStart() {
 
 function reset() {
   pause();
-  // Reset ends the session — if sound was linked to this session, stop it.
-  // Independent ambience (toggled on while idle) is left alone.
-  if (soundOn && soundLinkedToTimer) {
-    stopOceanWaves();
-    soundOn = false;
-    soundLinkedToTimer = false;
-    soundToggle.classList.remove('active');
+  if (anySoundActive() && mixLinkedToTimer) {
+    Object.keys(activeNodes).forEach(id => deactivateSound(id));
+    mixLinkedToTimer = false;
   }
   state.remaining = state.phase === 'focus'
     ? state.workMin * 60
     : state.breakMin * 60;
   state.totalForPhase = state.remaining;
   render();
+  renderSoundUI();
 }
 
 function completePhase() {
@@ -205,13 +240,11 @@ function completePhase() {
     state.totalForPhase = state.workMin * 60;
   }
   render();
-  // Auto-start the next phase after a short pause for breath
   setTimeout(() => start(), 1500);
 }
 
 function skip() {
   state.remaining = 0;
-  // Run completion logic immediately
   completePhase();
 }
 
@@ -230,194 +263,323 @@ function notify() {
 
 function requestNotificationPermission() {
   if (!('Notification' in window)) return;
-  if (Notification.permission === 'default') {
-    Notification.requestPermission();
-  }
+  if (Notification.permission === 'default') Notification.requestPermission();
 }
 
-// ---------- Audio: synthesized ocean waves ----------
-// We synthesize ocean sounds with the Web Audio API:
-//   - brown noise (deep rumble) for the body of the wave
-//   - a slow LFO modulating the volume to mimic the ebb/flow of waves
-//   - subtle high-passed white noise for the foam/crest
-// No audio files needed — works completely offline.
+// =========================================================
+//   AUDIO ENGINE
+// =========================================================
+//
+// Signal flow:
+//   each soundscape's source nodes
+//       → its own bus (per-sound gain, tied to per-sound volume slider)
+//           → masterGain (master volume slider)
+//               → duckGain (1.0 normally, ramps to 0 when timer paused if linked)
+//                   → destination
+//
+// The chime bypasses master/duck and goes straight to destination so it's
+// always audible regardless of mix or pause state.
 
-let audioCtx = null;
+let audioCtx   = null;
 let masterGain = null;
-let waveNodes = null;
-let soundOn = false;
-// Smart hybrid: if sound was toggled on while a timer was running, it's
-// "linked" — it follows the timer (pause→duck, resume→swell, reset→stop).
-// If toggled on while idle, it's "independent" — pure ambience that ignores
-// the timer until the user toggles it off manually.
-let soundLinkedToTimer = false;
+let duckGain   = null;
 
 function ensureAudioContext() {
   if (audioCtx) return;
   audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
   masterGain = audioCtx.createGain();
-  masterGain.gain.value = volumeSlider.value / 100 * 0.6; // cap so it never blasts
-  masterGain.connect(audioCtx.destination);
+  masterGain.gain.value = masterVolume / 100 * 0.6;
+
+  duckGain = audioCtx.createGain();
+  duckGain.gain.value = 1.0;
+
+  masterGain.connect(duckGain);
+  duckGain.connect(audioCtx.destination);
 }
 
-function createBrownNoise() {
-  const bufferSize = 2 * audioCtx.sampleRate;
-  const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+// ---------- Noise generators ----------
+function makeBrownNoiseSource(ctx) {
+  const size = 2 * ctx.sampleRate;
+  const buffer = ctx.createBuffer(1, size, ctx.sampleRate);
   const data = buffer.getChannelData(0);
-  let lastOut = 0;
-  for (let i = 0; i < bufferSize; i++) {
-    const white = Math.random() * 2 - 1;
-    data[i] = (lastOut + 0.02 * white) / 1.02;
-    lastOut = data[i];
+  let last = 0;
+  for (let i = 0; i < size; i++) {
+    const w = Math.random() * 2 - 1;
+    data[i] = (last + 0.02 * w) / 1.02;
+    last = data[i];
     data[i] *= 3.5;
   }
-  const node = audioCtx.createBufferSource();
-  node.buffer = buffer;
-  node.loop = true;
-  return node;
+  const src = ctx.createBufferSource();
+  src.buffer = buffer;
+  src.loop = true;
+  return src;
 }
 
-function createWhiteNoise() {
-  const bufferSize = 2 * audioCtx.sampleRate;
-  const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+function makeWhiteNoiseSource(ctx) {
+  const size = 2 * ctx.sampleRate;
+  const buffer = ctx.createBuffer(1, size, ctx.sampleRate);
   const data = buffer.getChannelData(0);
-  for (let i = 0; i < bufferSize; i++) {
-    data[i] = Math.random() * 2 - 1;
-  }
-  const node = audioCtx.createBufferSource();
-  node.buffer = buffer;
-  node.loop = true;
-  return node;
+  for (let i = 0; i < size; i++) data[i] = Math.random() * 2 - 1;
+  const src = ctx.createBufferSource();
+  src.buffer = buffer;
+  src.loop = true;
+  return src;
 }
 
-function startOceanWaves() {
-  ensureAudioContext();
-  if (audioCtx.state === 'suspended') audioCtx.resume();
-  if (waveNodes) return;
+// ---------- Soundscape factories ----------
+//
+// Each factory returns { bus, sources, cleanup? }. The bus is the per-sound
+// gain node and is what the mixer routes through.
 
-  // Brown noise (low rumble) → low-pass filter → wave gain (LFO modulated)
-  const brown = createBrownNoise();
-  const brownLowpass = audioCtx.createBiquadFilter();
-  brownLowpass.type = 'lowpass';
-  brownLowpass.frequency.value = 600;
+function createOceanWaves(ctx, dest) {
+  const bus = ctx.createGain();
+  bus.gain.value = 0;
+  bus.connect(dest);
 
-  const brownGain = audioCtx.createGain();
+  const brown = makeBrownNoiseSource(ctx);
+  const brownLP = ctx.createBiquadFilter();
+  brownLP.type = 'lowpass';
+  brownLP.frequency.value = 600;
+  const brownGain = ctx.createGain();
   brownGain.gain.value = 0.4;
+  brown.connect(brownLP); brownLP.connect(brownGain); brownGain.connect(bus);
 
-  brown.connect(brownLowpass);
-  brownLowpass.connect(brownGain);
+  const white = makeWhiteNoiseSource(ctx);
+  const whiteBP = ctx.createBiquadFilter();
+  whiteBP.type = 'bandpass';
+  whiteBP.frequency.value = 1200;
+  whiteBP.Q.value = 0.7;
+  const foamGain = ctx.createGain();
+  foamGain.gain.value = 0;
+  white.connect(whiteBP); whiteBP.connect(foamGain); foamGain.connect(bus);
 
-  // White noise (foam crest) → band-pass filter → foam gain (LFO modulated, quieter)
-  const white = createWhiteNoise();
-  const whiteFilter = audioCtx.createBiquadFilter();
-  whiteFilter.type = 'bandpass';
-  whiteFilter.frequency.value = 1200;
-  whiteFilter.Q.value = 0.7;
+  // Slow LFO that mimics ~10s wave swell
+  const lfo = ctx.createOscillator();
+  lfo.frequency.value = 0.1;
+  const lfoBrown = ctx.createGain(); lfoBrown.gain.value = 0.25;
+  const lfoFoam  = ctx.createGain(); lfoFoam.gain.value  = 0.18;
+  lfo.connect(lfoBrown); lfoBrown.connect(brownGain.gain);
+  lfo.connect(lfoFoam);  lfoFoam.connect(foamGain.gain);
 
-  const foamGain = audioCtx.createGain();
-  foamGain.gain.value = 0.0;
+  brown.start(); white.start(); lfo.start();
+  return { bus, sources: [brown, white, lfo] };
+}
 
-  white.connect(whiteFilter);
-  whiteFilter.connect(foamGain);
+function createRain(ctx, dest) {
+  const bus = ctx.createGain();
+  bus.gain.value = 0;
+  bus.connect(dest);
 
-  // LFO that creates the slow swelling/receding wave envelope (~10s per cycle)
-  const lfo = audioCtx.createOscillator();
-  lfo.frequency.value = 0.1; // 0.1 Hz = 10 second period
+  // Splash body: white noise band-limited to the "hiss" range
+  const white = makeWhiteNoiseSource(ctx);
+  const hp = ctx.createBiquadFilter();
+  hp.type = 'highpass'; hp.frequency.value = 400;
+  const lp = ctx.createBiquadFilter();
+  lp.type = 'lowpass';  lp.frequency.value = 4000;
+  const whiteGain = ctx.createGain(); whiteGain.gain.value = 0.5;
+  white.connect(hp); hp.connect(lp); lp.connect(whiteGain); whiteGain.connect(bus);
 
-  // Modulation depth for brown rumble
-  const lfoBrownGain = audioCtx.createGain();
-  lfoBrownGain.gain.value = 0.25;
-  lfo.connect(lfoBrownGain);
-  lfoBrownGain.connect(brownGain.gain);
+  // Surface body: deep brown for the "on water" feel
+  const brown = makeBrownNoiseSource(ctx);
+  const brownLP = ctx.createBiquadFilter();
+  brownLP.type = 'lowpass'; brownLP.frequency.value = 250;
+  const brownGain = ctx.createGain(); brownGain.gain.value = 0.25;
+  brown.connect(brownLP); brownLP.connect(brownGain); brownGain.connect(bus);
 
-  // Modulation depth for foam — louder when wave crests
-  const lfoFoamGain = audioCtx.createGain();
-  lfoFoamGain.gain.value = 0.18;
-  lfo.connect(lfoFoamGain);
-  lfoFoamGain.connect(foamGain.gain);
+  // Subtle ebb so it doesn't feel static
+  const lfo = ctx.createOscillator(); lfo.frequency.value = 0.06;
+  const lfoDepth = ctx.createGain();  lfoDepth.gain.value = 0.1;
+  lfo.connect(lfoDepth); lfoDepth.connect(whiteGain.gain);
 
-  // Combine into a wave bus
-  const waveBus = audioCtx.createGain();
-  waveBus.gain.value = 0.0;
-  brownGain.connect(waveBus);
-  foamGain.connect(waveBus);
-  waveBus.connect(masterGain);
+  brown.start(); white.start(); lfo.start();
+  return { bus, sources: [brown, white, lfo] };
+}
 
-  // Fade in
-  const now = audioCtx.currentTime;
-  waveBus.gain.cancelScheduledValues(now);
-  waveBus.gain.setValueAtTime(0, now);
-  waveBus.gain.linearRampToValueAtTime(1.0, now + 1.5);
+function createUnderwater(ctx, dest) {
+  const bus = ctx.createGain();
+  bus.gain.value = 0;
+  bus.connect(dest);
 
-  brown.start();
-  white.start();
+  // Two stacked low-pass filters → very deep, submerged sound
+  const brown = makeBrownNoiseSource(ctx);
+  const lp1 = ctx.createBiquadFilter(); lp1.type = 'lowpass'; lp1.frequency.value = 250;
+  const lp2 = ctx.createBiquadFilter(); lp2.type = 'lowpass'; lp2.frequency.value = 120;
+  const brownGain = ctx.createGain(); brownGain.gain.value = 0.75;
+  brown.connect(lp1); lp1.connect(lp2); lp2.connect(brownGain); brownGain.connect(bus);
+
+  // Sub-bass drone
+  const sub = ctx.createOscillator();
+  sub.type = 'sine'; sub.frequency.value = 65;
+  const subGain = ctx.createGain(); subGain.gain.value = 0.05;
+  sub.connect(subGain); subGain.connect(bus);
+
+  // Very slow breathing
+  const lfo = ctx.createOscillator(); lfo.frequency.value = 0.04;
+  const lfoDepth = ctx.createGain();  lfoDepth.gain.value = 0.18;
+  lfo.connect(lfoDepth); lfoDepth.connect(brownGain.gain);
+
+  brown.start(); sub.start(); lfo.start();
+  return { bus, sources: [brown, sub, lfo] };
+}
+
+function createThunder(ctx, dest) {
+  const bus = ctx.createGain();
+  bus.gain.value = 0;
+  bus.connect(dest);
+
+  // Quiet wind bed so it's not silent between rumbles
+  const wind = makeBrownNoiseSource(ctx);
+  const windLP = ctx.createBiquadFilter();
+  windLP.type = 'lowpass'; windLP.frequency.value = 280;
+  const windGain = ctx.createGain(); windGain.gain.value = 0.1;
+  wind.connect(windLP); windLP.connect(windGain); windGain.connect(bus);
+  wind.start();
+
+  const lfo = ctx.createOscillator(); lfo.frequency.value = 0.07;
+  const lfoDepth = ctx.createGain();  lfoDepth.gain.value = 0.06;
+  lfo.connect(lfoDepth); lfoDepth.connect(windGain.gain);
   lfo.start();
 
-  waveNodes = { brown, white, lfo, waveBus };
-}
+  // Distant rumble: brief envelope on heavily low-passed brown noise
+  let timeoutId = null;
+  let stopped = false;
 
-function stopOceanWaves() {
-  if (!waveNodes) return;
-  const { brown, white, lfo, waveBus } = waveNodes;
-  const now = audioCtx.currentTime;
-  waveBus.gain.cancelScheduledValues(now);
-  waveBus.gain.setValueAtTime(waveBus.gain.value, now);
-  waveBus.gain.linearRampToValueAtTime(0, now + 1.0);
-  setTimeout(() => {
-    try { brown.stop(); white.stop(); lfo.stop(); } catch (e) {}
-    waveNodes = null;
-  }, 1100);
-}
-
-// Duck = smoothly fade the wave bus to silence without tearing down the nodes,
-// so it can swell back when the user resumes.
-function duckSound() {
-  if (!waveNodes) return;
-  const now = audioCtx.currentTime;
-  const bus = waveNodes.waveBus;
-  bus.gain.cancelScheduledValues(now);
-  bus.gain.setValueAtTime(bus.gain.value, now);
-  bus.gain.linearRampToValueAtTime(0, now + 1.2);
-}
-
-function unduckSound() {
-  if (!waveNodes) return;
-  const now = audioCtx.currentTime;
-  const bus = waveNodes.waveBus;
-  bus.gain.cancelScheduledValues(now);
-  bus.gain.setValueAtTime(bus.gain.value, now);
-  bus.gain.linearRampToValueAtTime(1.0, now + 1.5);
-}
-
-function setVolume(pct) {
-  volValue.textContent = pct;
-  if (!masterGain) return;
-  masterGain.gain.setTargetAtTime(pct / 100 * 0.6, audioCtx.currentTime, 0.05);
-}
-
-function toggleSound() {
-  if (soundOn) {
-    stopOceanWaves();
-    soundOn = false;
-    soundLinkedToTimer = false;
-    soundToggle.classList.remove('active');
-  } else {
-    startOceanWaves();
-    soundOn = true;
-    // Linked if the timer is currently running; independent if toggled while idle.
-    soundLinkedToTimer = state.running;
-    soundToggle.classList.add('active');
+  function triggerRumble() {
+    if (stopped) return;
+    const now = ctx.currentTime;
+    const duration = 2.5 + Math.random() * 3.5;
+    const rumble = makeBrownNoiseSource(ctx);
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass'; filter.frequency.value = 90 + Math.random() * 70;
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0, now);
+    env.gain.linearRampToValueAtTime(0.55 + Math.random() * 0.35, now + 0.4 + Math.random() * 0.5);
+    env.gain.exponentialRampToValueAtTime(0.001, now + duration);
+    rumble.connect(filter); filter.connect(env); env.connect(bus);
+    rumble.start(now);
+    rumble.stop(now + duration + 0.2);
   }
+
+  function scheduleNext() {
+    if (stopped) return;
+    const delay = 16000 + Math.random() * 26000; // 16–42s
+    timeoutId = setTimeout(() => { triggerRumble(); scheduleNext(); }, delay);
+  }
+
+  // First rumble a few seconds in
+  timeoutId = setTimeout(() => { triggerRumble(); scheduleNext(); }, 4000 + Math.random() * 4000);
+
+  return {
+    bus,
+    sources: [wind, lfo],
+    cleanup: () => { stopped = true; if (timeoutId) clearTimeout(timeoutId); },
+  };
 }
 
-// ---------- Chime (gentle bell on phase complete) ----------
+const soundFactories = {
+  waves: createOceanWaves,
+  rain: createRain,
+  underwater: createUnderwater,
+  thunder: createThunder,
+};
+
+// ---------- Mixer control ----------
+function activateSound(id) {
+  ensureAudioContext();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  if (activeNodes[id]) return;
+
+  const factory = soundFactories[id];
+  if (!factory) return;
+
+  const wasEmpty = Object.keys(activeNodes).length === 0;
+  const nodes = factory(audioCtx, masterGain);
+  activeNodes[id] = nodes;
+
+  const now = audioCtx.currentTime;
+  const target = soundState[id].volume / 100;
+  nodes.bus.gain.cancelScheduledValues(now);
+  nodes.bus.gain.setValueAtTime(0, now);
+  nodes.bus.gain.linearRampToValueAtTime(target, now + 1.5);
+
+  soundState[id].active = true;
+  if (wasEmpty) mixLinkedToTimer = state.running;
+
+  saveState();
+}
+
+function deactivateSound(id) {
+  const nodes = activeNodes[id];
+  if (!nodes) return;
+
+  // Mark inactive immediately so re-activation sees fresh state.
+  delete activeNodes[id];
+  soundState[id].active = false;
+
+  const now = audioCtx.currentTime;
+  nodes.bus.gain.cancelScheduledValues(now);
+  nodes.bus.gain.setValueAtTime(nodes.bus.gain.value, now);
+  nodes.bus.gain.linearRampToValueAtTime(0, now + 1.0);
+
+  setTimeout(() => {
+    try {
+      nodes.sources.forEach(s => { try { s.stop(); } catch (e) {} });
+      if (nodes.cleanup) nodes.cleanup();
+    } catch (e) {}
+  }, 1100);
+
+  if (Object.keys(activeNodes).length === 0) mixLinkedToTimer = false;
+  saveState();
+}
+
+function toggleSoundById(id) {
+  if (soundState[id].active) deactivateSound(id);
+  else activateSound(id);
+  renderSoundUI();
+}
+
+function setSoundVolume(id, vol) {
+  soundState[id].volume = vol;
+  const nodes = activeNodes[id];
+  if (nodes && audioCtx) {
+    nodes.bus.gain.setTargetAtTime(vol / 100, audioCtx.currentTime, 0.05);
+  }
+  saveState();
+}
+
+function setMasterVolume(vol) {
+  masterVolume = vol;
+  if (masterGain && audioCtx) {
+    masterGain.gain.setTargetAtTime(vol / 100 * 0.6, audioCtx.currentTime, 0.05);
+  }
+  volValue.textContent = vol;
+  saveState();
+}
+
+// ---------- Duck / unduck (pause-linked mix) ----------
+function duckMix() {
+  if (!duckGain) return;
+  const now = audioCtx.currentTime;
+  duckGain.gain.cancelScheduledValues(now);
+  duckGain.gain.setValueAtTime(duckGain.gain.value, now);
+  duckGain.gain.linearRampToValueAtTime(0, now + 1.2);
+}
+
+function unduckMix() {
+  if (!duckGain) return;
+  const now = audioCtx.currentTime;
+  duckGain.gain.cancelScheduledValues(now);
+  duckGain.gain.setValueAtTime(duckGain.gain.value, now);
+  duckGain.gain.linearRampToValueAtTime(1.0, now + 1.5);
+}
+
+// ---------- Chime (always audible — bypasses master + duck) ----------
 function playChime() {
   ensureAudioContext();
   if (audioCtx.state === 'suspended') audioCtx.resume();
-
   const now = audioCtx.currentTime;
-  // Two soft sine tones a fifth apart, gently decaying
-  const tones = [528, 792]; // pleasing interval
+  const tones = [528, 792];
   tones.forEach((freq, i) => {
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
@@ -433,7 +595,10 @@ function playChime() {
   });
 }
 
-// ---------- Event listeners ----------
+// =========================================================
+//   EVENT LISTENERS
+// =========================================================
+
 startBtn.addEventListener('click', () => {
   toggleStart();
   requestNotificationPermission();
@@ -442,10 +607,23 @@ startBtn.addEventListener('click', () => {
 resetBtn.addEventListener('click', reset);
 skipBtn.addEventListener('click', skip);
 
-soundToggle.addEventListener('click', toggleSound);
+document.querySelectorAll('.sound-row-toggle').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const row = btn.closest('.mixer-row');
+    if (!row) return;
+    toggleSoundById(row.dataset.sound);
+  });
+});
 
-volumeSlider.addEventListener('input', (e) => {
-  setVolume(parseInt(e.target.value, 10));
+document.querySelectorAll('.sound-volume').forEach(slider => {
+  slider.addEventListener('input', (e) => {
+    const id = e.target.dataset.sound;
+    setSoundVolume(id, parseInt(e.target.value, 10));
+  });
+});
+
+masterSlider.addEventListener('input', (e) => {
+  setMasterVolume(parseInt(e.target.value, 10));
 });
 
 workInput.addEventListener('change', (e) => {
@@ -472,9 +650,7 @@ breakInput.addEventListener('change', (e) => {
   saveState();
 });
 
-// Spacebar to start/pause
 document.addEventListener('keydown', (e) => {
-  // Don't hijack typing in inputs
   if (e.target.tagName === 'INPUT') return;
   if (e.code === 'Space') {
     e.preventDefault();
@@ -486,5 +662,5 @@ document.addEventListener('keydown', (e) => {
 loadState();
 initWave();
 render();
+renderSoundUI();
 animateWave();
-volValue.textContent = volumeSlider.value;
