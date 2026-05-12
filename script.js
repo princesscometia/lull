@@ -443,25 +443,25 @@ function createRain(ctx, dest) {
   bus.gain.value = 0;
   bus.connect(dest);
 
-  // Splash body: white noise band-limited to the "hiss" range
+  // Light pitter-patter: high-band white noise, narrower and quieter than a downpour
   const white = makeWhiteNoiseSource(ctx);
   const hp = ctx.createBiquadFilter();
-  hp.type = 'highpass'; hp.frequency.value = 400;
+  hp.type = 'highpass'; hp.frequency.value = 900;
   const lp = ctx.createBiquadFilter();
-  lp.type = 'lowpass';  lp.frequency.value = 4000;
-  const whiteGain = ctx.createGain(); whiteGain.gain.value = 0.5;
+  lp.type = 'lowpass';  lp.frequency.value = 5500;
+  const whiteGain = ctx.createGain(); whiteGain.gain.value = 0.28;
   white.connect(hp); hp.connect(lp); lp.connect(whiteGain); whiteGain.connect(bus);
 
-  // Surface body: deep brown for the "on water" feel
+  // Very subtle surface presence — just enough to feel like rain on water, not heavy
   const brown = makeBrownNoiseSource(ctx);
   const brownLP = ctx.createBiquadFilter();
-  brownLP.type = 'lowpass'; brownLP.frequency.value = 250;
-  const brownGain = ctx.createGain(); brownGain.gain.value = 0.25;
+  brownLP.type = 'lowpass'; brownLP.frequency.value = 200;
+  const brownGain = ctx.createGain(); brownGain.gain.value = 0.08;
   brown.connect(brownLP); brownLP.connect(brownGain); brownGain.connect(bus);
 
-  // Subtle ebb so it doesn't feel static
+  // Gentle ebb so it doesn't feel static
   const lfo = ctx.createOscillator(); lfo.frequency.value = 0.06;
-  const lfoDepth = ctx.createGain();  lfoDepth.gain.value = 0.1;
+  const lfoDepth = ctx.createGain();  lfoDepth.gain.value = 0.07;
   lfo.connect(lfoDepth); lfoDepth.connect(whiteGain.gain);
 
   brown.start(); white.start(); lfo.start();
