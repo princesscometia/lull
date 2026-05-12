@@ -16,6 +16,8 @@ const masterSlider = document.getElementById('masterVolume');
 const volValue     = document.getElementById('volValue');
 const workInput    = document.getElementById('workMin');
 const breakInput   = document.getElementById('breakMin');
+const chimeSlider  = document.getElementById('chimeVolume');
+const chimeValueEl = document.getElementById('chimeVolumeValue');
 
 // ---------- State ----------
 const RING_CIRCUMFERENCE = 678.58; // 2 * π * 108
@@ -56,6 +58,9 @@ const soundState = {
 };
 
 let masterVolume = 50;
+// Chime volume is a 0-100 slider scaled to a max gain of 0.08 (the previous
+// loud default) so users have full range from silent to original-loud.
+let chimeVolume = 25;
 // Smart hybrid: linked if the first sound was started while a timer was running.
 // Independent if the user started a mix while idle (pure ambience).
 let mixLinkedToTimer = false;
@@ -79,6 +84,7 @@ function loadState() {
     state.lastDate      = saved.lastDate;
 
     if (typeof saved.masterVolume === 'number') masterVolume = saved.masterVolume;
+    if (typeof saved.chimeVolume === 'number')  chimeVolume  = saved.chimeVolume;
     if (saved.soundVolumes) {
       Object.entries(saved.soundVolumes).forEach(([k, v]) => {
         if (soundState[k] && typeof v === 'number') soundState[k].volume = v;
@@ -87,6 +93,8 @@ function loadState() {
 
     workInput.value  = state.workMin;
     breakInput.value = state.breakMin;
+    chimeSlider.value  = chimeVolume;
+    chimeValueEl.textContent = chimeVolume;
     state.remaining     = state.workMin * 60;
     state.totalForPhase = state.workMin * 60;
   } catch (e) {}
@@ -99,6 +107,7 @@ function saveState() {
     sessionsToday: state.sessionsToday,
     lastDate: state.lastDate,
     masterVolume,
+    chimeVolume,
     soundVolumes: Object.fromEntries(
       Object.entries(soundState).map(([k, v]) => [k, v.volume])
     ),
@@ -704,7 +713,13 @@ function unduckMix() {
 }
 
 // ---------- Chime (always audible — bypasses master + duck) ----------
+// Envelope: silent → linear attack → exponential decay → linear fade to absolute 0.
+// The final linear fade prevents the tail "click" you get when an oscillator stops
+// while its gain is still non-zero (exponential decay can't reach exactly 0).
 function playChime() {
+  const peak = (chimeVolume / 100) * 0.08;
+  if (peak < 0.0005) return; // effectively muted
+
   ensureAudioContext();
   if (audioCtx.state === 'suspended') audioCtx.resume();
   const now = audioCtx.currentTime;
@@ -714,13 +729,21 @@ function playChime() {
     const gain = audioCtx.createGain();
     osc.type = 'sine';
     osc.frequency.value = freq;
-    gain.gain.setValueAtTime(0, now);
-    gain.gain.linearRampToValueAtTime(0.04, now + 0.05 + i * 0.1);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 2.5 + i * 0.2);
+
+    const start     = now + i * 0.1;
+    const attackEnd = now + 0.05 + i * 0.1;
+    const decayEnd  = now + 2.5  + i * 0.2;
+    const fadeEnd   = now + 3.3  + i * 0.2;
+
+    gain.gain.setValueAtTime(0, start);
+    gain.gain.linearRampToValueAtTime(peak, attackEnd);
+    gain.gain.exponentialRampToValueAtTime(0.0005, decayEnd);
+    gain.gain.linearRampToValueAtTime(0, fadeEnd);
+
     osc.connect(gain);
     gain.connect(audioCtx.destination);
-    osc.start(now + i * 0.1);
-    osc.stop(now + 3.0);
+    osc.start(start);
+    osc.stop(fadeEnd + 0.1);
   });
 }
 
@@ -776,6 +799,12 @@ breakInput.addEventListener('change', (e) => {
     state.totalForPhase = v * 60;
     render();
   }
+  saveState();
+});
+
+chimeSlider.addEventListener('input', (e) => {
+  chimeVolume = parseInt(e.target.value, 10);
+  chimeValueEl.textContent = chimeVolume;
   saveState();
 });
 
