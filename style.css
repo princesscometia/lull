@@ -14,10 +14,16 @@
   --c-text-soft: rgba(244, 237, 228, 0.72);
   --c-text-faint: rgba(244, 237, 228, 0.5);
 
-  --glass-bg: rgba(255, 255, 255, 0.08);
-  --glass-bg-strong: rgba(255, 255, 255, 0.14);
-  --glass-border: rgba(255, 255, 255, 0.18);
-  --glass-shadow: 0 20px 60px rgba(8, 36, 50, 0.35);
+  --glass-bg: rgba(255, 255, 255, 0.06);
+  --glass-bg-strong: rgba(255, 255, 255, 0.12);
+  --glass-border: rgba(255, 255, 255, 0.09);
+  /* Multi-layer soft shadow with negative spreads → no hard panel-separator
+     line between stacked cards. Each layer falls off at a different rate so
+     the overall glow feels continuous and diffuse rather than blocky. */
+  --glass-shadow:
+    0 1px 2px rgba(8, 36, 50, 0.05),
+    0 6px 14px -4px rgba(8, 36, 50, 0.14),
+    0 22px 44px -14px rgba(8, 36, 50, 0.22);
 
   --radius-lg: 24px;
   --radius-md: 16px;
@@ -241,11 +247,11 @@ body.theme-twilight .wave-3 { fill: #7d5a85; }
 
 .glass {
   background: var(--glass-bg);
-  backdrop-filter: blur(24px) saturate(140%);
-  -webkit-backdrop-filter: blur(24px) saturate(140%);
+  backdrop-filter: blur(30px) saturate(150%);
+  -webkit-backdrop-filter: blur(30px) saturate(150%);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg);
-  box-shadow: var(--glass-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  box-shadow: var(--glass-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.07);
   padding: 32px 28px;
 }
 
@@ -1858,9 +1864,11 @@ body.immersive .header:hover {
 body.immersive .timer-card {
   background: rgba(255, 255, 255, 0.07);
   border-color: rgba(168, 230, 220, 0.22);
-  box-shadow: 0 30px 80px rgba(3, 25, 42, 0.55),
-              inset 0 1px 0 rgba(255, 255, 255, 0.12),
-              0 0 90px rgba(127, 209, 197, 0.18);
+  box-shadow:
+    0 8px 24px -6px rgba(3, 25, 42, 0.32),
+    0 30px 60px -12px rgba(3, 25, 42, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 0 60px rgba(127, 209, 197, 0.15);
 }
 
 body.immersive .time {
