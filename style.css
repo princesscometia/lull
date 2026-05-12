@@ -1767,7 +1767,10 @@ input[type="range"]::-moz-range-thumb {
   font-style: italic;
 }
 
-/* Screen dim during sleep mode */
+/* Screen dim during sleep mode.
+   Caps at 0.88 (~12% screen visibility) regardless of sleep duration —
+   like an actual device sleep mode where you can still faintly see things
+   rather than going to pitch black. */
 .sleep-dim {
   position: fixed;
   inset: 0;
@@ -1779,20 +1782,52 @@ input[type="range"]::-moz-range-thumb {
 }
 
 body.sleeping .sleep-dim {
-  opacity: calc(var(--sleep-dim, 0) * 0.94);
+  opacity: calc(var(--sleep-dim, 0) * 0.88);
 }
 
 body.sleep-complete .sleep-dim {
-  opacity: 0.94;
+  opacity: 0.88;
   pointer-events: auto;
   cursor: pointer;
 }
 
-/* Sleep panel rises above the dim when sleep is active/complete */
-body.sleeping .mode-panel[data-mode="sleep"],
-body.sleep-complete .mode-panel[data-mode="sleep"] {
-  position: relative;
-  z-index: 105;
+/* Wake button: when sleep cycle is complete, lift the primary button out
+   of the panel and center it on screen above the dim, with a soft fade-up
+   entrance and a gentle ongoing glow to draw the eye. */
+body.sleep-complete .sleep-action-btn.primary {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: 110;
+  opacity: 0;
+  /* Two animations: appear once, then glow forever */
+  animation:
+    wake-appear 1.4s cubic-bezier(0.4, 0, 0.2, 1) 0.5s forwards,
+    wake-glow 4s ease-in-out 2.0s infinite;
+}
+
+@keyframes wake-appear {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, calc(-50% + 14px));
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+  }
+}
+
+@keyframes wake-glow {
+  0%, 100% {
+    box-shadow:
+      0 4px 24px rgba(168, 230, 220, 0.28),
+      0 0 0 0 rgba(168, 230, 220, 0.15);
+  }
+  50% {
+    box-shadow:
+      0 6px 36px rgba(168, 230, 220, 0.55),
+      0 0 0 8px rgba(168, 230, 220, 0.05);
+  }
 }
 
 /* Hidden by default; revealed in immersive mode */
