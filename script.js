@@ -337,14 +337,16 @@ function createOceanWaves(ctx, dest) {
   bus.gain.value = 0;
   bus.connect(dest);
 
+  // --- Layer 1: deep rumble (body of the wave) ---
   const brown = makeBrownNoiseSource(ctx);
   const brownLP = ctx.createBiquadFilter();
   brownLP.type = 'lowpass';
   brownLP.frequency.value = 600;
   const brownGain = ctx.createGain();
-  brownGain.gain.value = 0.4;
+  brownGain.gain.value = 0.35;
   brown.connect(brownLP); brownLP.connect(brownGain); brownGain.connect(bus);
 
+  // --- Layer 2: foam crests (bandpassed white noise, filter swept over time) ---
   const white = makeWhiteNoiseSource(ctx);
   const whiteBP = ctx.createBiquadFilter();
   whiteBP.type = 'bandpass';
@@ -354,16 +356,86 @@ function createOceanWaves(ctx, dest) {
   foamGain.gain.value = 0;
   white.connect(whiteBP); whiteBP.connect(foamGain); foamGain.connect(bus);
 
-  // Slow LFO that mimics ~10s wave swell
-  const lfo = ctx.createOscillator();
-  lfo.frequency.value = 0.1;
-  const lfoBrown = ctx.createGain(); lfoBrown.gain.value = 0.25;
-  const lfoFoam  = ctx.createGain(); lfoFoam.gain.value  = 0.18;
-  lfo.connect(lfoBrown); lfoBrown.connect(brownGain.gain);
-  lfo.connect(lfoFoam);  lfoFoam.connect(foamGain.gain);
+  // --- Layer 3: distant rolling waves (heavily low-passed, slow) ---
+  const distantBrown = makeBrownNoiseSource(ctx);
+  const distantLP = ctx.createBiquadFilter();
+  distantLP.type = 'lowpass';
+  distantLP.frequency.value = 200;
+  const distantGain = ctx.createGain();
+  distantGain.gain.value = 0.18;
+  distantBrown.connect(distantLP); distantLP.connect(distantGain); distantGain.connect(bus);
 
-  brown.start(); white.start(); lfo.start();
-  return { bus, sources: [brown, white, lfo] };
+  // --- LFOs with incommensurate frequencies → mix never quite repeats ---
+  // Primary swell ~10s
+  const lfo1 = ctx.createOscillator();
+  lfo1.frequency.value = 0.1;
+  // Secondary ~13.3s — intentionally not a multiple of lfo1
+  const lfo2 = ctx.createOscillator();
+  lfo2.frequency.value = 0.075;
+  // Distant roll ~25s
+  const lfo3 = ctx.createOscillator();
+  lfo3.frequency.value = 0.04;
+  // Filter sweep ~17s — varies foam character so crests don't sound identical
+  const lfoFilter = ctx.createOscillator();
+  lfoFilter.frequency.value = 0.058;
+
+  // Brown rumble modulated by both lfo1 + lfo2 (sometimes reinforce, sometimes cancel)
+  const lfo1Brown = ctx.createGain(); lfo1Brown.gain.value = 0.18;
+  const lfo2Brown = ctx.createGain(); lfo2Brown.gain.value = 0.1;
+  lfo1.connect(lfo1Brown); lfo1Brown.connect(brownGain.gain);
+  lfo2.connect(lfo2Brown); lfo2Brown.connect(brownGain.gain);
+
+  // Foam follows the same two LFOs
+  const lfo1Foam = ctx.createGain(); lfo1Foam.gain.value = 0.13;
+  const lfo2Foam = ctx.createGain(); lfo2Foam.gain.value = 0.09;
+  lfo1.connect(lfo1Foam); lfo1Foam.connect(foamGain.gain);
+  lfo2.connect(lfo2Foam); lfo2Foam.connect(foamGain.gain);
+
+  // Distant layer breathes on the slowest LFO
+  const lfo3Distant = ctx.createGain(); lfo3Distant.gain.value = 0.09;
+  lfo3.connect(lfo3Distant); lfo3Distant.connect(distantGain.gain);
+
+  // Sweep the foam bandpass center freq ±400Hz around 1200Hz so crests vary in character
+  const lfoFilterDepth = ctx.createGain(); lfoFilterDepth.gain.value = 400;
+  lfoFilter.connect(lfoFilterDepth); lfoFilterDepth.connect(whiteBP.frequency);
+
+  brown.start(); white.start(); distantBrown.start();
+  lfo1.start(); lfo2.start(); lfo3.start(); lfoFilter.start();
+
+  // --- Layer 4: occasional bigger crest (random scheduling) ---
+  let stopped = false;
+  let timeoutId = null;
+
+  function triggerBigCrest() {
+    if (stopped) return;
+    const now = ctx.currentTime;
+    const duration = 3.5 + Math.random() * 3;
+    const crest = makeWhiteNoiseSource(ctx);
+    const crestFilter = ctx.createBiquadFilter();
+    crestFilter.type = 'bandpass';
+    crestFilter.frequency.value = 900 + Math.random() * 700;
+    crestFilter.Q.value = 0.5 + Math.random() * 0.4;
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0, now);
+    env.gain.linearRampToValueAtTime(0.15 + Math.random() * 0.13, now + 0.7 + Math.random() * 0.6);
+    env.gain.linearRampToValueAtTime(0, now + duration);
+    crest.connect(crestFilter); crestFilter.connect(env); env.connect(bus);
+    crest.start(now);
+    crest.stop(now + duration + 0.2);
+  }
+
+  function scheduleNextCrest() {
+    if (stopped) return;
+    const delay = 14000 + Math.random() * 20000; // 14–34s between bigger crests
+    timeoutId = setTimeout(() => { triggerBigCrest(); scheduleNextCrest(); }, delay);
+  }
+  timeoutId = setTimeout(() => { triggerBigCrest(); scheduleNextCrest(); }, 6000 + Math.random() * 6000);
+
+  return {
+    bus,
+    sources: [brown, white, distantBrown, lfo1, lfo2, lfo3, lfoFilter],
+    cleanup: () => { stopped = true; if (timeoutId) clearTimeout(timeoutId); },
+  };
 }
 
 function createRain(ctx, dest) {
