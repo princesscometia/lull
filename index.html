@@ -92,16 +92,41 @@
     <span class="light-ray" style="left: 88%; animation-duration: 19s; animation-delay: 12s;"></span>
   </div>
 
-  <!-- Immersive toggle (top-right) -->
-  <button class="immersive-toggle" id="immersiveToggle" type="button" aria-label="Toggle immersive mode" aria-pressed="false">
-    <span class="immersive-icon" aria-hidden="true">
-      <svg viewBox="0 0 24 24" width="14" height="14">
-        <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-    </span>
-    <span class="immersive-label">Immersive</span>
-    <span class="pro-badge" aria-label="Pro feature">PRO</span>
-  </button>
+  <!-- Top-right controls (immersive + sleep mode) -->
+  <div class="top-bar">
+    <div class="sleep-control" id="sleepControl">
+      <button class="sleep-toggle" id="sleepToggle" type="button" aria-label="Start sleep mode">
+        <span class="sleep-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="14" height="14">
+            <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linejoin="round" stroke-linecap="round"/>
+          </svg>
+        </span>
+        <span class="sleep-label" id="sleepLabel">Sleep</span>
+        <span class="pro-badge" aria-label="Pro feature">PRO</span>
+      </button>
+
+      <div class="sleep-options" id="sleepOptions" role="menu" aria-label="Choose sleep duration">
+        <button class="sleep-duration" data-min="15" type="button">15m</button>
+        <button class="sleep-duration" data-min="30" type="button">30m</button>
+        <button class="sleep-duration" data-min="45" type="button">45m</button>
+        <button class="sleep-duration" data-min="60" type="button">60m</button>
+      </div>
+    </div>
+
+    <button class="immersive-toggle" id="immersiveToggle" type="button" aria-label="Toggle immersive mode" aria-pressed="false">
+      <span class="immersive-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="14" height="14">
+          <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </span>
+      <span class="immersive-label">Immersive</span>
+      <span class="pro-badge" aria-label="Pro feature">PRO</span>
+    </button>
+  </div>
+
+  <!-- Sleep mode dim overlay -->
+  <div class="sleep-dim" id="sleepDim" aria-hidden="true"></div>
+  <button class="sleep-wake" id="sleepWake" type="button" aria-label="Wake up" hidden>Tap to wake</button>
 
   <!-- App shell -->
   <main class="app">
