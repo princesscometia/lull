@@ -513,44 +513,79 @@ function createThunder(ctx, dest) {
   lfo.connect(lfoDepth); lfoDepth.connect(windGain.gain);
   lfo.start();
 
-  // Rumbles come in two flavors:
-  //  - distant (most common): low cutoff, slower attack, the classic rolling rumble
+  // Rumbles come in three flavors:
+  //  - distant (~55%): low cutoff, slower attack, classic rolling rumble
   //  - closer (~30%): higher cutoff, faster attack, more present and impactful
+  //  - long roll (~15%): extended 9-14s rumble that builds, sustains, then trails off,
+  //    with the filter cutoff sweeping downward so it feels like the sound is moving away
   let timeoutId = null;
   let stopped = false;
 
+  function triggerDistant(now) {
+    const duration = 3.5 + Math.random() * 4;
+    const rumble = makeBrownNoiseSource(ctx);
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass'; filter.frequency.value = 180 + Math.random() * 140;
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0, now);
+    env.gain.linearRampToValueAtTime(0.85 + Math.random() * 0.4, now + 0.4 + Math.random() * 0.5);
+    env.gain.exponentialRampToValueAtTime(0.001, now + duration);
+    rumble.connect(filter); filter.connect(env); env.connect(bus);
+    rumble.start(now);
+    rumble.stop(now + duration + 0.2);
+  }
+
+  function triggerCloser(now) {
+    const duration = 3 + Math.random() * 3;
+    const rumble = makeBrownNoiseSource(ctx);
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass'; filter.frequency.value = 380 + Math.random() * 240;
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0, now);
+    env.gain.linearRampToValueAtTime(1.0 + Math.random() * 0.4, now + 0.2 + Math.random() * 0.3);
+    env.gain.exponentialRampToValueAtTime(0.001, now + duration);
+    rumble.connect(filter); filter.connect(env); env.connect(bus);
+    rumble.start(now);
+    rumble.stop(now + duration + 0.2);
+  }
+
+  function triggerLongRoll(now) {
+    const duration = 9 + Math.random() * 5;          // 9-14s
+    const attack   = 1.2 + Math.random() * 0.8;      // gradual build (1.2-2s)
+    const sustainPoint = duration * (0.55 + Math.random() * 0.15);
+    const peak     = 0.75 + Math.random() * 0.3;
+
+    // Two stacked brown sources for added thickness
+    const r1 = makeBrownNoiseSource(ctx);
+    const r2 = makeBrownNoiseSource(ctx);
+
+    // Filter cutoff sweeps downward over the duration → sound recedes into the distance
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    const startFreq = 280 + Math.random() * 100;
+    const endFreq   = 130 + Math.random() * 30;
+    filter.frequency.setValueAtTime(startFreq, now);
+    filter.frequency.linearRampToValueAtTime(endFreq, now + duration);
+
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0, now);
+    env.gain.linearRampToValueAtTime(peak, now + attack);
+    env.gain.linearRampToValueAtTime(peak * 0.9, now + sustainPoint);
+    env.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+    r1.connect(filter); r2.connect(filter); filter.connect(env); env.connect(bus);
+    r1.start(now); r2.start(now);
+    r1.stop(now + duration + 0.3);
+    r2.stop(now + duration + 0.3);
+  }
+
   function triggerRumble() {
     if (stopped) return;
-    const isCloser = Math.random() < 0.3;
+    const r = Math.random();
     const now = ctx.currentTime;
-
-    if (isCloser) {
-      // Closer strike — brighter, sharper, more in-your-face
-      const duration = 3 + Math.random() * 3;
-      const rumble = makeBrownNoiseSource(ctx);
-      const filter = ctx.createBiquadFilter();
-      filter.type = 'lowpass'; filter.frequency.value = 380 + Math.random() * 240;
-      const env = ctx.createGain();
-      env.gain.setValueAtTime(0, now);
-      env.gain.linearRampToValueAtTime(1.0 + Math.random() * 0.4, now + 0.2 + Math.random() * 0.3);
-      env.gain.exponentialRampToValueAtTime(0.001, now + duration);
-      rumble.connect(filter); filter.connect(env); env.connect(bus);
-      rumble.start(now);
-      rumble.stop(now + duration + 0.2);
-    } else {
-      // Distant rolling rumble — louder than before but same character
-      const duration = 3.5 + Math.random() * 4;
-      const rumble = makeBrownNoiseSource(ctx);
-      const filter = ctx.createBiquadFilter();
-      filter.type = 'lowpass'; filter.frequency.value = 180 + Math.random() * 140;
-      const env = ctx.createGain();
-      env.gain.setValueAtTime(0, now);
-      env.gain.linearRampToValueAtTime(0.85 + Math.random() * 0.4, now + 0.4 + Math.random() * 0.5);
-      env.gain.exponentialRampToValueAtTime(0.001, now + duration);
-      rumble.connect(filter); filter.connect(env); env.connect(bus);
-      rumble.start(now);
-      rumble.stop(now + duration + 0.2);
-    }
+    if (r < 0.55)      triggerDistant(now);
+    else if (r < 0.85) triggerCloser(now);
+    else               triggerLongRoll(now);
   }
 
   function scheduleNext() {
