@@ -127,6 +127,27 @@ function formatTime(secs) {
   return `${m}:${s}`;
 }
 
+// Stroke visibility — keep the ring/wave hidden while there's no progress.
+// Showing is immediate; hiding is delayed slightly past the 1s dashoffset
+// transition so the shrink-back-to-empty animation plays out on reset.
+let strokeHideTimeoutId = null;
+function setStrokesVisible(visible) {
+  if (strokeHideTimeoutId) {
+    clearTimeout(strokeHideTimeoutId);
+    strokeHideTimeoutId = null;
+  }
+  if (visible) {
+    ringProgress.style.visibility = 'visible';
+    ringWaveEl.style.visibility = 'visible';
+  } else {
+    strokeHideTimeoutId = setTimeout(() => {
+      ringProgress.style.visibility = 'hidden';
+      ringWaveEl.style.visibility = 'hidden';
+      strokeHideTimeoutId = null;
+    }, 1050);
+  }
+}
+
 function render() {
   timeEl.textContent = formatTime(state.remaining);
   phaseEl.textContent = state.phase === 'focus' ? 'Focus' : 'Break';
@@ -137,6 +158,7 @@ function render() {
   const fraction = elapsed / state.totalForPhase;
   ringProgress.style.strokeDashoffset = RING_CIRCUMFERENCE * (1 - fraction);
   ringWaveEl.style.strokeDashoffset   = WAVE_LENGTH * (1 - fraction);
+  setStrokesVisible(fraction > 0);
 
   // Duration controls: highlight current phase, disable while running
   durationControls.forEach(c => {

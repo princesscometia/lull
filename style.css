@@ -389,6 +389,9 @@ body {
   stroke-dasharray: 678.58; /* 2 * π * 108 */
   stroke-dashoffset: 0;
   transition: stroke-dashoffset 1s linear;
+  /* Hidden until there's actual progress — prevents the rounded-cap pixel
+     flicker that SVG draws at the dash boundary when stroke length is 0 */
+  visibility: hidden;
 }
 
 .ring-wave {
@@ -400,6 +403,7 @@ body {
   transition: stroke-dashoffset 1s linear;
   filter: drop-shadow(0 0 6px rgba(168, 230, 220, 0.45));
   opacity: 0.9;
+  visibility: hidden; /* same reason as .ring-progress */
 }
 
 .timer-display {
