@@ -19,6 +19,7 @@ const breakDurEl   = document.getElementById('breakDuration');
 const durationControls = document.querySelectorAll('.duration-control');
 const chimeSlider  = document.getElementById('chimeVolume');
 const chimeValueEl = document.getElementById('chimeVolumeValue');
+const immersiveToggle = document.getElementById('immersiveToggle');
 
 // ---------- State ----------
 const RING_CIRCUMFERENCE = 678.58; // 2 * π * 108
@@ -62,6 +63,7 @@ let masterVolume = 50;
 // Chime volume is a 0-100 slider scaled to a max gain of 0.08 (the previous
 // loud default) so users have full range from silent to original-loud.
 let chimeVolume = 25;
+let immersiveMode = false;
 // Smart hybrid: linked if the first sound was started while a timer was running.
 // Independent if the user started a mix while idle (pure ambience).
 let mixLinkedToTimer = false;
@@ -86,6 +88,7 @@ function loadState() {
 
     if (typeof saved.masterVolume === 'number') masterVolume = saved.masterVolume;
     if (typeof saved.chimeVolume === 'number')  chimeVolume  = saved.chimeVolume;
+    if (typeof saved.immersiveMode === 'boolean') immersiveMode = saved.immersiveMode;
     if (saved.soundVolumes) {
       Object.entries(saved.soundVolumes).forEach(([k, v]) => {
         if (soundState[k] && typeof v === 'number') soundState[k].volume = v;
@@ -109,6 +112,7 @@ function saveState() {
     lastDate: state.lastDate,
     masterVolume,
     chimeVolume,
+    immersiveMode,
     soundVolumes: Object.fromEntries(
       Object.entries(soundState).map(([k, v]) => [k, v.volume])
     ),
@@ -866,6 +870,19 @@ chimeSlider.addEventListener('input', (e) => {
   saveState();
 });
 
+// ---------- Immersive mode ----------
+function applyImmersive() {
+  document.body.classList.toggle('immersive', immersiveMode);
+  immersiveToggle.classList.toggle('active', immersiveMode);
+  immersiveToggle.setAttribute('aria-pressed', String(immersiveMode));
+}
+
+immersiveToggle.addEventListener('click', () => {
+  immersiveMode = !immersiveMode;
+  applyImmersive();
+  saveState();
+});
+
 document.addEventListener('keydown', (e) => {
   if (e.target.tagName === 'INPUT') return;
   if (e.code === 'Space') {
@@ -879,4 +896,5 @@ loadState();
 initWave();
 render();
 renderSoundUI();
+applyImmersive();
 animateWave();

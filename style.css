@@ -821,12 +821,264 @@ input[type="range"]::-moz-range-thumb {
   .glass { padding: 24px 20px; }
 }
 
+/* =========================================================
+   IMMERSIVE MODE
+   ========================================================= */
+
+/* Toggle button (top-right, always visible) */
+.immersive-toggle {
+  position: fixed;
+  top: 22px;
+  right: 22px;
+  z-index: 50;
+  background: rgba(255, 255, 255, 0.07);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 999px;
+  padding: 8px 12px 8px 14px;
+  color: var(--c-text-soft);
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.25s ease;
+}
+
+.immersive-toggle:hover {
+  background: rgba(255, 255, 255, 0.13);
+  color: var(--c-foam);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(127, 209, 197, 0.15);
+}
+
+.immersive-toggle.active {
+  background: linear-gradient(135deg, rgba(127, 209, 197, 0.28), rgba(168, 230, 220, 0.18));
+  color: var(--c-foam);
+  border-color: rgba(168, 230, 220, 0.4);
+  box-shadow: 0 4px 24px rgba(127, 209, 197, 0.3);
+}
+
+.immersive-icon svg { display: block; }
+
+.pro-badge {
+  font-size: 9px;
+  letter-spacing: 0.15em;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--c-aqua), var(--c-foam));
+  color: #062a36;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+/* Hidden by default; revealed in immersive mode */
+.immersive-only {
+  opacity: 0;
+  transition: opacity 1.2s ease;
+  pointer-events: none;
+}
+
+body.immersive .immersive-only {
+  opacity: 1;
+}
+
+/* ---------- Deepen background ---------- */
+body {
+  transition: background 1.2s ease;
+}
+
+body.immersive {
+  background: linear-gradient(180deg, #14495a 0%, #0a3848 35%, #062a3a 70%, #03192a 100%);
+  background-attachment: fixed;
+}
+
+/* ---------- Dim UI cards (timer stays prominent) ---------- */
+.app,
+.glass,
+.glass-subtle,
+.header,
+.footer,
+.controls,
+.sound-card,
+.settings {
+  transition: opacity 0.8s ease, background 0.8s ease, box-shadow 0.8s ease, border-color 0.8s ease;
+}
+
+body.immersive .header {
+  opacity: 0.45;
+}
+
+body.immersive .footer {
+  opacity: 0.25;
+}
+
+body.immersive .sound-card {
+  opacity: 0.3;
+}
+
+body.immersive .settings {
+  opacity: 0.3;
+}
+
+/* Cards wake up when hovered/focused so they're still usable */
+body.immersive .sound-card:hover,
+body.immersive .sound-card:focus-within,
+body.immersive .settings:hover,
+body.immersive .settings:focus-within,
+body.immersive .header:hover {
+  opacity: 0.95;
+}
+
+/* ---------- Lift the timer into the spotlight ---------- */
+body.immersive .timer-card {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(168, 230, 220, 0.22);
+  box-shadow: 0 30px 80px rgba(3, 25, 42, 0.55),
+              inset 0 1px 0 rgba(255, 255, 255, 0.12),
+              0 0 90px rgba(127, 209, 197, 0.18);
+}
+
+body.immersive .time {
+  text-shadow: 0 0 30px rgba(168, 230, 220, 0.55);
+}
+
+body.immersive .ring-progress {
+  filter: drop-shadow(0 0 18px rgba(168, 230, 220, 0.55));
+}
+
+body.immersive .ring-wave {
+  opacity: 1;
+  stroke-width: 2;
+  filter: drop-shadow(0 0 10px rgba(168, 230, 220, 0.65));
+}
+
+body.immersive .timer-ring {
+  filter: drop-shadow(0 0 26px rgba(168, 230, 220, 0.3));
+}
+
+/* ---------- More dramatic background motion ---------- */
+body.immersive .caustics {
+  opacity: 1;
+  filter: blur(55px);
+}
+
+body.immersive .wave-1,
+body.immersive .wave-2,
+body.immersive .wave-3 {
+  fill-opacity: 0.32;
+}
+
+body.immersive .particles {
+  opacity: 1;
+}
+
+/* Extra wave layers (only present in immersive) */
+.wave-4 {
+  fill: #b8eee5;
+  fill-opacity: 0;
+  animation: wave-drift-4 26s ease-in-out infinite;
+}
+
+.wave-5 {
+  fill: #4a8a9c;
+  fill-opacity: 0;
+  animation: wave-drift-5 30s ease-in-out infinite;
+}
+
+body.immersive .wave-4 { fill-opacity: 0.16; }
+body.immersive .wave-5 { fill-opacity: 0.22; }
+
+@keyframes wave-drift-4 {
+  0%, 100% { transform: translateX(0)    translateY(0); }
+  50%      { transform: translateX(-50px) translateY(-14px); }
+}
+@keyframes wave-drift-5 {
+  0%, 100% { transform: translateX(0)    translateY(0); }
+  50%      { transform: translateX(60px) translateY(-18px); }
+}
+
+/* =========================================================
+   BUBBLES (rising from the bottom)
+   ========================================================= */
+
+.bubbles {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.bubble {
+  position: absolute;
+  bottom: -40px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%,
+    rgba(255, 255, 255, 0.65),
+    rgba(168, 230, 220, 0.15) 55%,
+    transparent 75%);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  box-shadow: inset 0 0 6px rgba(168, 230, 220, 0.25);
+  animation: bubble-rise linear infinite;
+  will-change: transform, opacity;
+}
+
+@keyframes bubble-rise {
+  0%   { transform: translateY(0)     translateX(0);    opacity: 0; }
+  8%   {                                                  opacity: 0.95; }
+  25%  { transform: translateY(-25vh) translateX(14px);  }
+  50%  { transform: translateY(-55vh) translateX(-10px); }
+  75%  { transform: translateY(-80vh) translateX(8px);   }
+  92%  {                                                  opacity: 0.8; }
+  100% { transform: translateY(-115vh) translateX(0);     opacity: 0; }
+}
+
+/* =========================================================
+   LIGHT RAYS (sunlight filtering down through the water)
+   ========================================================= */
+
+.light-rays {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 100vh;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.light-ray {
+  position: absolute;
+  top: -25%;
+  width: 90px;
+  height: 140vh;
+  background: linear-gradient(180deg,
+    rgba(255, 255, 255, 0.18) 0%,
+    rgba(168, 230, 220, 0.10) 35%,
+    rgba(127, 209, 197, 0.04) 70%,
+    transparent 100%);
+  filter: blur(24px);
+  transform-origin: top center;
+  animation: ray-sway ease-in-out infinite alternate;
+  will-change: transform, opacity;
+}
+
+@keyframes ray-sway {
+  0%   { transform: rotate(-4deg) translateX(-10px); opacity: 0.5; }
+  100% { transform: rotate(4deg)  translateX(15px);  opacity: 1;   }
+}
+
 /* Reduce motion for accessibility */
 @media (prefers-reduced-motion: reduce) {
   .caustics,
-  .wave-1, .wave-2, .wave-3,
+  .wave-1, .wave-2, .wave-3, .wave-4, .wave-5,
   .particles,
-  .brand-dot {
+  .brand-dot,
+  .bubble,
+  .light-ray {
     animation: none;
   }
 }

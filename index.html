@@ -18,9 +18,46 @@
       <path class="wave wave-1" d="M0,160 C320,260 720,80 1440,180 L1440,320 L0,320 Z"></path>
       <path class="wave wave-2" d="M0,200 C360,120 720,260 1440,160 L1440,320 L0,320 Z"></path>
       <path class="wave wave-3" d="M0,240 C400,180 800,300 1440,220 L1440,320 L0,320 Z"></path>
+      <path class="wave wave-4 immersive-only" d="M0,140 C300,220 660,60 1440,150 L1440,320 L0,320 Z"></path>
+      <path class="wave wave-5 immersive-only" d="M0,260 C320,180 760,280 1440,200 L1440,320 L0,320 Z"></path>
     </svg>
     <div class="particles"></div>
   </div>
+
+  <!-- Immersive overlays (visible only when immersive mode is on) -->
+  <div class="bubbles immersive-only" aria-hidden="true">
+    <span class="bubble" style="left:  6%; width: 14px; height: 14px; animation-duration: 19s; animation-delay:  0s;"></span>
+    <span class="bubble" style="left: 14%; width:  8px; height:  8px; animation-duration: 24s; animation-delay:  4s;"></span>
+    <span class="bubble" style="left: 22%; width: 22px; height: 22px; animation-duration: 17s; animation-delay:  8s;"></span>
+    <span class="bubble" style="left: 30%; width: 10px; height: 10px; animation-duration: 26s; animation-delay:  2s;"></span>
+    <span class="bubble" style="left: 38%; width: 16px; height: 16px; animation-duration: 21s; animation-delay: 11s;"></span>
+    <span class="bubble" style="left: 47%; width:  6px; height:  6px; animation-duration: 28s; animation-delay:  6s;"></span>
+    <span class="bubble" style="left: 55%; width: 19px; height: 19px; animation-duration: 18s; animation-delay: 14s;"></span>
+    <span class="bubble" style="left: 63%; width:  9px; height:  9px; animation-duration: 23s; animation-delay:  1s;"></span>
+    <span class="bubble" style="left: 71%; width: 14px; height: 14px; animation-duration: 16s; animation-delay:  9s;"></span>
+    <span class="bubble" style="left: 79%; width: 11px; height: 11px; animation-duration: 22s; animation-delay:  5s;"></span>
+    <span class="bubble" style="left: 87%; width:  7px; height:  7px; animation-duration: 27s; animation-delay: 13s;"></span>
+    <span class="bubble" style="left: 94%; width: 13px; height: 13px; animation-duration: 20s; animation-delay:  7s;"></span>
+  </div>
+
+  <div class="light-rays immersive-only" aria-hidden="true">
+    <span class="light-ray" style="left: 12%; animation-duration: 18s; animation-delay:  0s;"></span>
+    <span class="light-ray" style="left: 30%; animation-duration: 22s; animation-delay:  4s;"></span>
+    <span class="light-ray" style="left: 50%; animation-duration: 17s; animation-delay:  9s;"></span>
+    <span class="light-ray" style="left: 70%; animation-duration: 24s; animation-delay:  3s;"></span>
+    <span class="light-ray" style="left: 88%; animation-duration: 19s; animation-delay: 12s;"></span>
+  </div>
+
+  <!-- Immersive toggle (top-right) -->
+  <button class="immersive-toggle" id="immersiveToggle" type="button" aria-label="Toggle immersive mode" aria-pressed="false">
+    <span class="immersive-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" width="14" height="14">
+        <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </span>
+    <span class="immersive-label">Immersive</span>
+    <span class="pro-badge" aria-label="Pro feature">PRO</span>
+  </button>
 
   <!-- App shell -->
   <main class="app">
