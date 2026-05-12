@@ -43,7 +43,44 @@ body {
   position: relative;
   display: flex;
   flex-direction: column;
+  /* CSS can't tween between gradients, but switching themes still feels nicer
+     with a gentle opacity cross-fade on the wave fills + brand color shifts */
+  transition: --c-aqua 0.6s ease, --c-foam 0.6s ease;
 }
+
+/* =========================================================
+   THEMES (PRO) — override the base palette + body gradient
+   ========================================================= */
+
+/* Deep Abyss — dark, mysterious, bioluminescent greens */
+body.theme-abyss {
+  --c-aqua: #5cbfb0;
+  --c-foam: #9fe0d0;
+  background: linear-gradient(180deg, #173545 0%, #0c2030 40%, #06141f 75%, #02080e 100%);
+}
+body.theme-abyss .wave-1 { fill: #6ad0c0; }
+body.theme-abyss .wave-2 { fill: #4a9aa0; }
+body.theme-abyss .wave-3 { fill: #2d6a72; }
+
+/* Arctic — icy, pale, frosted */
+body.theme-arctic {
+  --c-aqua: #8fc8df;
+  --c-foam: #d7eef5;
+  background: linear-gradient(180deg, #c8e0eb 0%, #94bbcf 40%, #5a85a6 75%, #2d4a65 100%);
+}
+body.theme-arctic .wave-1 { fill: #d8eff5; }
+body.theme-arctic .wave-2 { fill: #a3c8db; }
+body.theme-arctic .wave-3 { fill: #6e98b5; }
+
+/* Twilight Cove — sunset orange fading to indigo */
+body.theme-twilight {
+  --c-aqua: #e8a890;
+  --c-foam: #f5d5c0;
+  background: linear-gradient(180deg, #d88a78 0%, #a06480 40%, #58447c 75%, #1e1a45 100%);
+}
+body.theme-twilight .wave-1 { fill: #f0c5b0; }
+body.theme-twilight .wave-2 { fill: #c08a98; }
+body.theme-twilight .wave-3 { fill: #7d5a85; }
 
 /* =========================================================
    ANIMATED OCEAN BACKGROUND
@@ -665,6 +702,40 @@ body {
   gap: 4px;
 }
 
+/* Section divider between free and pro soundscapes */
+.mixer-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0 4px;
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--c-text-faint);
+  font-weight: 500;
+}
+
+.mixer-divider::before,
+.mixer-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent);
+}
+
+/* Small inline PRO badge for pro-feature rows */
+.pro-badge-mini {
+  font-size: 8px;
+  letter-spacing: 0.15em;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--c-aqua), var(--c-foam));
+  color: #062a36;
+  padding: 2px 5px;
+  border-radius: 3px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
 .mixer-row {
   display: grid;
   grid-template-columns: minmax(140px, 1fr) minmax(0, 1.1fr);
@@ -923,6 +994,62 @@ input[type="range"]::-moz-range-thumb {
   font-variant-numeric: tabular-nums;
   width: 28px;
   text-align: right;
+}
+
+/* Settings row that stacks vertically (label above content) */
+.setting-row-block {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.setting-row-block > label {
+  color: var(--c-text-soft);
+}
+
+/* Theme picker */
+.theme-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.theme-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px 6px 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  color: var(--c-text-soft);
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.theme-chip:hover {
+  background: rgba(255, 255, 255, 0.11);
+  color: var(--c-foam);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.theme-chip.active {
+  background: rgba(168, 230, 220, 0.16);
+  border-color: rgba(168, 230, 220, 0.45);
+  color: var(--c-foam);
+  box-shadow: 0 2px 12px rgba(127, 209, 197, 0.18);
+}
+
+.theme-swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  box-shadow: inset 0 0 4px rgba(0, 0, 0, 0.2);
+  flex-shrink: 0;
 }
 
 /* =========================================================

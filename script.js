@@ -25,6 +25,7 @@ const presetSaveChip  = document.getElementById('presetSaveChip');
 const presetSaveBtn   = document.getElementById('presetSaveBtn');
 const presetSaveForm  = document.getElementById('presetSaveForm');
 const presetSaveInput = document.getElementById('presetSaveInput');
+const themePicker     = document.getElementById('themePicker');
 
 // ---------- State ----------
 const RING_CIRCUMFERENCE = 678.58; // 2 * π * 108
@@ -62,6 +63,11 @@ const soundState = {
   rain:       { active: false, volume: 50 },
   underwater: { active: false, volume: 55 },
   thunder:    { active: false, volume: 45 },
+  fire:       { active: false, volume: 55 },
+  coffee:     { active: false, volume: 50 },
+  whales:     { active: false, volume: 50 },
+  wind:       { active: false, volume: 45 },
+  pink:       { active: false, volume: 40 },
 };
 
 let masterVolume = 50;
@@ -69,6 +75,7 @@ let masterVolume = 50;
 // loud default) so users have full range from silent to original-loud.
 let chimeVolume = 25;
 let immersiveMode = false;
+let currentTheme = 'default'; // 'default' | 'abyss' | 'arctic' | 'twilight'
 
 // ---------- Preset library ----------
 const BUILTIN_PRESETS = [
@@ -111,6 +118,7 @@ function loadState() {
     if (typeof saved.masterVolume === 'number') masterVolume = saved.masterVolume;
     if (typeof saved.chimeVolume === 'number')  chimeVolume  = saved.chimeVolume;
     if (typeof saved.immersiveMode === 'boolean') immersiveMode = saved.immersiveMode;
+    if (typeof saved.theme === 'string') currentTheme = saved.theme;
     if (saved.soundVolumes) {
       Object.entries(saved.soundVolumes).forEach(([k, v]) => {
         if (soundState[k] && typeof v === 'number') soundState[k].volume = v;
@@ -135,6 +143,7 @@ function saveState() {
     masterVolume,
     chimeVolume,
     immersiveMode,
+    theme: currentTheme,
     soundVolumes: Object.fromEntries(
       Object.entries(soundState).map(([k, v]) => [k, v.volume])
     ),
@@ -385,6 +394,30 @@ function makeWhiteNoiseSource(ctx) {
   const buffer = ctx.createBuffer(1, size, ctx.sampleRate);
   const data = buffer.getChannelData(0);
   for (let i = 0; i < size; i++) data[i] = Math.random() * 2 - 1;
+  const src = ctx.createBufferSource();
+  src.buffer = buffer;
+  src.loop = true;
+  return src;
+}
+
+// Paul Kellet's pink noise approximation
+function makePinkNoiseSource(ctx) {
+  const size = 2 * ctx.sampleRate;
+  const buffer = ctx.createBuffer(1, size, ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+  let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+  for (let i = 0; i < size; i++) {
+    const white = Math.random() * 2 - 1;
+    b0 = 0.99886 * b0 + white * 0.0555179;
+    b1 = 0.99332 * b1 + white * 0.0750759;
+    b2 = 0.96900 * b2 + white * 0.1538520;
+    b3 = 0.86650 * b3 + white * 0.3104856;
+    b4 = 0.55000 * b4 + white * 0.5329522;
+    b5 = -0.7616 * b5 - white * 0.0168980;
+    data[i] = b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362;
+    data[i] *= 0.11;
+    b6 = white * 0.115926;
+  }
   const src = ctx.createBufferSource();
   src.buffer = buffer;
   src.loop = true;
@@ -670,11 +703,246 @@ function createThunder(ctx, dest) {
   };
 }
 
+// --- Crackling Fire ---
+function createFire(ctx, dest) {
+  const bus = ctx.createGain();
+  bus.gain.value = 0;
+  bus.connect(dest);
+
+  // Warm whoosh body
+  const body = makeBrownNoiseSource(ctx);
+  const bodyLP = ctx.createBiquadFilter();
+  bodyLP.type = 'lowpass'; bodyLP.frequency.value = 350;
+  const bodyGain = ctx.createGain(); bodyGain.gain.value = 0.18;
+  body.connect(bodyLP); bodyLP.connect(bodyGain); bodyGain.connect(bus);
+  body.start();
+
+  // Slow whoosh modulation
+  const lfo = ctx.createOscillator(); lfo.frequency.value = 0.15;
+  const lfoDepth = ctx.createGain(); lfoDepth.gain.value = 0.08;
+  lfo.connect(lfoDepth); lfoDepth.connect(bodyGain.gain);
+  lfo.start();
+
+  // Random crackles
+  let timeoutId = null;
+  let stopped = false;
+  function triggerCrackle() {
+    if (stopped) return;
+    const now = ctx.currentTime;
+    const duration = 0.05 + Math.random() * 0.15;
+    const crackle = makeWhiteNoiseSource(ctx);
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.value = 1500 + Math.random() * 2500;
+    filter.Q.value = 1.5 + Math.random() * 1.5;
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0, now);
+    env.gain.linearRampToValueAtTime(0.32 + Math.random() * 0.28, now + 0.005 + Math.random() * 0.015);
+    env.gain.exponentialRampToValueAtTime(0.001, now + duration);
+    crackle.connect(filter); filter.connect(env); env.connect(bus);
+    crackle.start(now);
+    crackle.stop(now + duration + 0.05);
+  }
+  function scheduleNext() {
+    if (stopped) return;
+    const delay = 100 + Math.random() * 1400;
+    timeoutId = setTimeout(() => { triggerCrackle(); scheduleNext(); }, delay);
+  }
+  timeoutId = setTimeout(() => { triggerCrackle(); scheduleNext(); }, 400);
+
+  return {
+    bus, sources: [body, lfo],
+    cleanup: () => { stopped = true; if (timeoutId) clearTimeout(timeoutId); },
+  };
+}
+
+// --- Coffee Shop ---
+function createCoffeeShop(ctx, dest) {
+  const bus = ctx.createGain();
+  bus.gain.value = 0;
+  bus.connect(dest);
+
+  // Murmur (filtered noise, voice frequency range)
+  const murmur = makeWhiteNoiseSource(ctx);
+  const murmurHP = ctx.createBiquadFilter();
+  murmurHP.type = 'highpass'; murmurHP.frequency.value = 200;
+  const murmurLP = ctx.createBiquadFilter();
+  murmurLP.type = 'lowpass'; murmurLP.frequency.value = 1500;
+  const murmurGain = ctx.createGain(); murmurGain.gain.value = 0.18;
+  murmur.connect(murmurHP); murmurHP.connect(murmurLP); murmurLP.connect(murmurGain); murmurGain.connect(bus);
+  murmur.start();
+
+  // Slow waves of conversation
+  const lfo = ctx.createOscillator(); lfo.frequency.value = 0.08;
+  const lfoDepth = ctx.createGain(); lfoDepth.gain.value = 0.06;
+  lfo.connect(lfoDepth); lfoDepth.connect(murmurGain.gain);
+  lfo.start();
+
+  // Room rumble bed
+  const body = makeBrownNoiseSource(ctx);
+  const bodyLP = ctx.createBiquadFilter();
+  bodyLP.type = 'lowpass'; bodyLP.frequency.value = 200;
+  const bodyGain = ctx.createGain(); bodyGain.gain.value = 0.1;
+  body.connect(bodyLP); bodyLP.connect(bodyGain); bodyGain.connect(bus);
+  body.start();
+
+  // Occasional cup/spoon clinks
+  let timeoutId = null;
+  let stopped = false;
+  function triggerClink() {
+    if (stopped) return;
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.value = 2800 + Math.random() * 1400;
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0, now);
+    env.gain.linearRampToValueAtTime(0.04 + Math.random() * 0.03, now + 0.005);
+    env.gain.exponentialRampToValueAtTime(0.001, now + 0.35 + Math.random() * 0.4);
+    osc.connect(env); env.connect(bus);
+    osc.start(now);
+    osc.stop(now + 0.9);
+  }
+  function scheduleNext() {
+    if (stopped) return;
+    const delay = 4000 + Math.random() * 8000;
+    timeoutId = setTimeout(() => { triggerClink(); scheduleNext(); }, delay);
+  }
+  timeoutId = setTimeout(() => { triggerClink(); scheduleNext(); }, 2000 + Math.random() * 3000);
+
+  return {
+    bus, sources: [murmur, body, lfo],
+    cleanup: () => { stopped = true; if (timeoutId) clearTimeout(timeoutId); },
+  };
+}
+
+// --- Whale Songs ---
+function createWhales(ctx, dest) {
+  const bus = ctx.createGain();
+  bus.gain.value = 0;
+  bus.connect(dest);
+
+  // Quiet underwater bed
+  const bed = makeBrownNoiseSource(ctx);
+  const bedLP1 = ctx.createBiquadFilter();
+  bedLP1.type = 'lowpass'; bedLP1.frequency.value = 180;
+  const bedLP2 = ctx.createBiquadFilter();
+  bedLP2.type = 'lowpass'; bedLP2.frequency.value = 100;
+  const bedGain = ctx.createGain(); bedGain.gain.value = 0.18;
+  bed.connect(bedLP1); bedLP1.connect(bedLP2); bedLP2.connect(bedGain); bedGain.connect(bus);
+  bed.start();
+
+  // Sparse whale calls
+  let timeoutId = null;
+  let stopped = false;
+  function triggerSong() {
+    if (stopped) return;
+    const now = ctx.currentTime;
+    const duration = 5 + Math.random() * 6;
+    const osc = ctx.createOscillator();
+    osc.type = 'sine';
+    const base = 75 + Math.random() * 75;
+    osc.frequency.setValueAtTime(base, now);
+    osc.frequency.linearRampToValueAtTime(base * 0.7, now + duration * 0.3);
+    osc.frequency.linearRampToValueAtTime(base * 1.25, now + duration * 0.65);
+    osc.frequency.linearRampToValueAtTime(base * 0.85, now + duration);
+
+    // Subtle harmonic for richness
+    const harm = ctx.createOscillator();
+    harm.type = 'sine';
+    harm.frequency.setValueAtTime(base * 2, now);
+    harm.frequency.linearRampToValueAtTime(base * 1.4, now + duration * 0.3);
+    harm.frequency.linearRampToValueAtTime(base * 2.5, now + duration * 0.65);
+    harm.frequency.linearRampToValueAtTime(base * 1.7, now + duration);
+    const harmGain = ctx.createGain();
+    harmGain.gain.value = 0.06;
+    harm.connect(harmGain);
+
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0, now);
+    env.gain.linearRampToValueAtTime(0.28, now + 1.5);
+    env.gain.setValueAtTime(0.28, now + duration - 1.5);
+    env.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+    osc.connect(env);
+    harmGain.connect(env);
+    env.connect(bus);
+    osc.start(now); harm.start(now);
+    osc.stop(now + duration + 0.1); harm.stop(now + duration + 0.1);
+  }
+  function scheduleNext() {
+    if (stopped) return;
+    const delay = 12000 + Math.random() * 22000;
+    timeoutId = setTimeout(() => { triggerSong(); scheduleNext(); }, delay);
+  }
+  timeoutId = setTimeout(() => { triggerSong(); scheduleNext(); }, 3000 + Math.random() * 4000);
+
+  return {
+    bus, sources: [bed],
+    cleanup: () => { stopped = true; if (timeoutId) clearTimeout(timeoutId); },
+  };
+}
+
+// --- Wind ---
+function createWind(ctx, dest) {
+  const bus = ctx.createGain();
+  bus.gain.value = 0;
+  bus.connect(dest);
+
+  const wind = makeWhiteNoiseSource(ctx);
+  const hp = ctx.createBiquadFilter();
+  hp.type = 'highpass'; hp.frequency.value = 300;
+  const lp = ctx.createBiquadFilter();
+  lp.type = 'lowpass'; lp.frequency.value = 1800;
+  const windGain = ctx.createGain(); windGain.gain.value = 0.22;
+  wind.connect(hp); hp.connect(lp); lp.connect(windGain); windGain.connect(bus);
+  wind.start();
+
+  // Gusts via two incommensurate LFOs
+  const lfo1 = ctx.createOscillator(); lfo1.frequency.value = 0.12;
+  const lfo1Depth = ctx.createGain(); lfo1Depth.gain.value = 0.13;
+  lfo1.connect(lfo1Depth); lfo1Depth.connect(windGain.gain);
+  lfo1.start();
+
+  const lfo2 = ctx.createOscillator(); lfo2.frequency.value = 0.083;
+  const lfo2Depth = ctx.createGain(); lfo2Depth.gain.value = 0.08;
+  lfo2.connect(lfo2Depth); lfo2Depth.connect(windGain.gain);
+  lfo2.start();
+
+  // Filter sweep adds whooshing character
+  const filterLfo = ctx.createOscillator(); filterLfo.frequency.value = 0.06;
+  const filterDepth = ctx.createGain(); filterDepth.gain.value = 400;
+  filterLfo.connect(filterDepth); filterDepth.connect(hp.frequency);
+  filterLfo.start();
+
+  return { bus, sources: [wind, lfo1, lfo2, filterLfo] };
+}
+
+// --- Pink Noise ---
+function createPinkNoise(ctx, dest) {
+  const bus = ctx.createGain();
+  bus.gain.value = 0;
+  bus.connect(dest);
+
+  const pink = makePinkNoiseSource(ctx);
+  const gain = ctx.createGain();
+  gain.gain.value = 0.45;
+  pink.connect(gain); gain.connect(bus);
+  pink.start();
+
+  return { bus, sources: [pink] };
+}
+
 const soundFactories = {
   waves: createOceanWaves,
   rain: createRain,
   underwater: createUnderwater,
   thunder: createThunder,
+  fire: createFire,
+  coffee: createCoffeeShop,
+  whales: createWhales,
+  wind: createWind,
+  pink: createPinkNoise,
 };
 
 // ---------- Mixer control ----------
@@ -1099,6 +1367,25 @@ immersiveToggle.addEventListener('click', () => {
   saveState();
 });
 
+// ---------- Theme picker ----------
+function applyTheme() {
+  ['theme-abyss', 'theme-arctic', 'theme-twilight'].forEach(c => document.body.classList.remove(c));
+  if (currentTheme !== 'default') {
+    document.body.classList.add(`theme-${currentTheme}`);
+  }
+  themePicker.querySelectorAll('.theme-chip').forEach(chip => {
+    chip.classList.toggle('active', chip.dataset.theme === currentTheme);
+  });
+}
+
+themePicker.addEventListener('click', (e) => {
+  const chip = e.target.closest('.theme-chip');
+  if (!chip) return;
+  currentTheme = chip.dataset.theme;
+  applyTheme();
+  saveState();
+});
+
 document.addEventListener('keydown', (e) => {
   if (e.target.tagName === 'INPUT') return;
   if (e.code === 'Space') {
@@ -1114,4 +1401,5 @@ render();
 renderSoundUI();
 renderPresets();
 applyImmersive();
+applyTheme();
 animateWave();
