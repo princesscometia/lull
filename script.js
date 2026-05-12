@@ -1515,6 +1515,7 @@ function renderSleepPanel() {
     <h2 class="sleep-headline">Drift off gently</h2>
     <p class="sleep-blurb">Pick a duration and your sleep mix will fade smoothly to silence over that time.</p>
     <div class="sleep-durations">
+      <button class="sleep-duration-card test-only" type="button" data-min="1"><span class="num">1</span><span class="unit">test</span></button>
       <button class="sleep-duration-card" type="button" data-min="15"><span class="num">15</span><span class="unit">min</span></button>
       <button class="sleep-duration-card" type="button" data-min="30"><span class="num">30</span><span class="unit">min</span></button>
       <button class="sleep-duration-card" type="button" data-min="45"><span class="num">45</span><span class="unit">min</span></button>
