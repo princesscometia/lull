@@ -956,7 +956,11 @@ body.immersive .header:hover {
 
 /* ---------- Lift the timer into the spotlight ---------- */
 
-/* Smooth all the visual properties that change between modes */
+/* Smooth all the visual properties that change between modes.
+   IMPORTANT: stroke-dashoffset is included so the timer fill animation
+   (the per-second progress tick) keeps working — without it, the
+   shorthand here would overwrite the 'transition: stroke-dashoffset 1s linear'
+   defined on .ring-progress / .ring-wave above and break the animation. */
 .time,
 .ring-progress,
 .ring-wave,
@@ -965,11 +969,12 @@ body.immersive .header:hover {
 .wave-1, .wave-2, .wave-3, .wave-4, .wave-5,
 .particles {
   transition:
-    opacity         2.4s cubic-bezier(0.4, 0, 0.2, 1),
-    fill-opacity    2.4s cubic-bezier(0.4, 0, 0.2, 1),
-    text-shadow     2.4s cubic-bezier(0.4, 0, 0.2, 1),
-    filter          2.4s cubic-bezier(0.4, 0, 0.2, 1),
-    stroke-width    2.4s cubic-bezier(0.4, 0, 0.2, 1);
+    stroke-dashoffset 1s   linear,
+    opacity           2.4s cubic-bezier(0.4, 0, 0.2, 1),
+    fill-opacity      2.4s cubic-bezier(0.4, 0, 0.2, 1),
+    text-shadow       2.4s cubic-bezier(0.4, 0, 0.2, 1),
+    filter            2.4s cubic-bezier(0.4, 0, 0.2, 1),
+    stroke-width      2.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 body.immersive .timer-card {
