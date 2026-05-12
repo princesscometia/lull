@@ -265,6 +265,33 @@ body.theme-twilight .wave-3 { fill: #7d5a85; }
 }
 
 /* =========================================================
+   FOCUS PANEL — single unified glass card holding timer + mixer + stats
+   (mirrors the Sleep panel structure for visual consistency)
+   ========================================================= */
+
+.focus-panel-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  align-items: center;
+}
+
+/* All section children fill the panel width */
+.focus-panel-content > .timer-card,
+.focus-panel-content > .sound-card,
+.focus-panel-content > .stats-card {
+  width: 100%;
+}
+
+/* Subsequent sections get a divider above them (timer is first, no divider) */
+.focus-panel-content > .sound-card,
+.focus-panel-content > .stats-card {
+  padding-top: 22px;
+  margin-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* =========================================================
    TIMER CARD
    ========================================================= */
 
@@ -548,7 +575,6 @@ body.theme-twilight .wave-3 { fill: #7d5a85; }
    ========================================================= */
 
 .sound-card {
-  padding: 24px 28px;
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -912,7 +938,6 @@ input[type="range"]::-moz-range-thumb {
   display: flex;
   flex-direction: column;
   gap: 18px;
-  padding: 26px 28px;
 }
 
 .stats-card-header {
@@ -1451,22 +1476,11 @@ input[type="range"]::-moz-range-thumb {
 
 .sleep-durations {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 8px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
   width: 100%;
-  max-width: 400px;
+  max-width: 360px;
   margin-top: 8px;
-}
-
-/* TEMP: 1-minute test card — distinguish so it's easy to find and remove */
-.sleep-duration-card.test-only {
-  border-style: dashed;
-  border-color: rgba(168, 230, 220, 0.35);
-  opacity: 0.85;
-}
-
-.sleep-duration-card.test-only .unit {
-  letter-spacing: 0.15em;
 }
 
 .sleep-duration-card {
