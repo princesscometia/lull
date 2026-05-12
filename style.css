@@ -886,14 +886,22 @@ body.immersive .immersive-only {
   opacity: 1;
 }
 
-/* ---------- Deepen background ---------- */
-body {
-  transition: background 2.8s cubic-bezier(0.4, 0, 0.2, 1);
+/* ---------- Deepen background ----------
+   CSS can't transition between two linear-gradient backgrounds directly,
+   so we overlay a fixed div with the deeper gradient and animate its opacity.
+*/
+.bg-immersive-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background: linear-gradient(180deg, #14495a 0%, #0a3848 35%, #062a3a 70%, #03192a 100%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 2.8s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-body.immersive {
-  background: linear-gradient(180deg, #14495a 0%, #0a3848 35%, #062a3a 70%, #03192a 100%);
-  background-attachment: fixed;
+body.immersive .bg-immersive-overlay {
+  opacity: 1;
 }
 
 /* ---------- Dim UI cards (timer stays prominent) ---------- */
