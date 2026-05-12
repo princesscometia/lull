@@ -715,7 +715,7 @@ function playChime() {
     osc.type = 'sine';
     osc.frequency.value = freq;
     gain.gain.setValueAtTime(0, now);
-    gain.gain.linearRampToValueAtTime(0.18, now + 0.05 + i * 0.1);
+    gain.gain.linearRampToValueAtTime(0.04, now + 0.05 + i * 0.1);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 2.5 + i * 0.2);
     osc.connect(gain);
     gain.connect(audioCtx.destination);
