@@ -1357,15 +1357,25 @@ input[type="range"]::-moz-range-thumb {
 
 .mode-viewport {
   width: 100%;
+  /* Clip only horizontally so card shadows can extend vertically without
+     getting cut off at the top/bottom edges of the viewport */
+  overflow-x: clip;
+  overflow-y: visible;
+  /* Fallback for older browsers that don't support overflow:clip */
   overflow: hidden;
-  /* Allow content height to determine the panel height */
+  overflow: clip visible;
 }
 
 .mode-track {
   display: flex;
   width: 200%;
   transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-  touch-action: pan-y; /* allow vertical scroll inside, horizontal swipe captured by JS */
+  touch-action: pan-y;
+  will-change: transform;
+}
+
+.mode-track.dragging {
+  transition: none;
 }
 
 .mode-track.show-sleep {
@@ -1399,11 +1409,9 @@ input[type="range"]::-moz-range-thumb {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 22px;
-  padding: 40px 28px;
+  gap: 20px;
+  padding: 36px 28px;
   text-align: center;
-  min-height: 480px;
-  justify-content: center;
 }
 
 .sleep-moon {
@@ -1517,6 +1525,147 @@ input[type="range"]::-moz-range-thumb {
   font-size: 12px;
   color: var(--c-text-faint);
   font-style: italic;
+}
+
+/* Sleep stats block within the panel */
+.sleep-stats-block {
+  margin-top: 8px;
+  padding-top: 22px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sleep-stats-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.sleep-stats-title {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 16px;
+  color: var(--c-foam);
+  letter-spacing: -0.01em;
+}
+
+.sleep-stats-subtitle {
+  font-size: 10px;
+  color: var(--c-text-faint);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.sleep-stats-main {
+  display: grid;
+  grid-template-columns: 1fr 1px 1fr;
+  gap: 14px;
+  align-items: center;
+}
+
+.sleep-stats-main::before {
+  content: '';
+  grid-column: 2;
+  align-self: stretch;
+  background: linear-gradient(180deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.12) 50%,
+    transparent 100%);
+  width: 1px;
+}
+
+.sleep-stats-today {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.sleep-stats-today-number {
+  font-family: var(--font-display);
+  font-weight: 300;
+  font-size: 36px;
+  line-height: 1;
+  color: var(--c-foam);
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 16px rgba(168, 230, 220, 0.25);
+}
+
+.sleep-stats-today-label {
+  font-size: 9px;
+  color: var(--c-text-faint);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+.sleep-stats-streak {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--c-foam);
+  transition: opacity 0.3s ease, color 0.3s ease;
+}
+
+.sleep-stats-streak.inactive {
+  opacity: 0.4;
+  color: var(--c-text-faint);
+}
+
+.sleep-stats-streak-icon {
+  color: var(--c-aqua);
+  filter: drop-shadow(0 0 6px rgba(127, 209, 197, 0.4));
+  flex-shrink: 0;
+}
+
+.sleep-stats-streak.inactive .sleep-stats-streak-icon {
+  color: var(--c-text-faint);
+  filter: none;
+}
+
+.sleep-stats-streak-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.sleep-stats-streak-number {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 22px;
+  line-height: 1;
+  color: var(--c-foam);
+  font-variant-numeric: tabular-nums;
+}
+
+.sleep-stats-streak-label {
+  font-size: 9px;
+  color: var(--c-text-faint);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+.sleep-stats-heatmap {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 5px;
+}
+
+.sleep-stats-footer {
+  font-size: 11px;
+  color: var(--c-text-faint);
+  letter-spacing: 0.05em;
+  text-align: center;
+}
+
+.sleep-stats-footer strong {
+  color: var(--c-foam);
+  font-weight: 500;
 }
 
 /* Active (countdown running) state */

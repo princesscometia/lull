@@ -843,6 +843,13 @@ function saveStatsToStorage() {
   localStorage.setItem(STATS_KEY, JSON.stringify(stats));
 }
 
+// kind = 'focus' uses .sessions/.minutes;  'sleep' uses .sleepSessions/.sleepMinutes
+function keysFor(kind) {
+  return kind === 'sleep'
+    ? { s: 'sleepSessions', m: 'sleepMinutes' }
+    : { s: 'sessions',      m: 'minutes' };
+}
+
 function recordFocusSession(minutes) {
   const day = todayKey();
   if (!stats.byDay[day]) stats.byDay[day] = { sessions: 0, minutes: 0 };
@@ -852,20 +859,29 @@ function recordFocusSession(minutes) {
   renderStats();
 }
 
+function recordSleepSession(minutes) {
+  const day = todayKey();
+  if (!stats.byDay[day]) stats.byDay[day] = { sessions: 0, minutes: 0 };
+  stats.byDay[day].sleepSessions = (stats.byDay[day].sleepSessions || 0) + 1;
+  stats.byDay[day].sleepMinutes  = (stats.byDay[day].sleepMinutes  || 0) + minutes;
+  saveStatsToStorage();
+  renderSleepStats();
+}
+
 function dayKeyFor(date) {
   return `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
 }
 
-function getCurrentStreak() {
+function getCurrentStreak(kind = 'focus') {
+  const { s } = keysFor(kind);
   let streak = 0;
   const cursor = new Date();
-  const todayHasSessions = (stats.byDay[todayKey()]?.sessions || 0) > 0;
-  // If today is empty, count from yesterday backward (streak is still "alive" until end of today)
+  const todayHasSessions = (stats.byDay[todayKey()]?.[s] || 0) > 0;
   if (!todayHasSessions) cursor.setDate(cursor.getDate() - 1);
 
   while (true) {
     const key = dayKeyFor(cursor);
-    if ((stats.byDay[key]?.sessions || 0) > 0) {
+    if ((stats.byDay[key]?.[s] || 0) > 0) {
       streak += 1;
       cursor.setDate(cursor.getDate() - 1);
     } else break;
@@ -873,7 +889,8 @@ function getCurrentStreak() {
   return streak;
 }
 
-function getLast7Days() {
+function getLast7Days(kind = 'focus') {
+  const { s, m } = keysFor(kind);
   const out = [];
   for (let i = 6; i >= 0; i--) {
     const d = new Date();
@@ -882,19 +899,20 @@ function getLast7Days() {
     out.push({
       key,
       letter: d.toLocaleDateString(undefined, { weekday: 'short' })[0],
-      minutes: stats.byDay[key]?.minutes || 0,
-      sessions: stats.byDay[key]?.sessions || 0,
+      minutes: stats.byDay[key]?.[m] || 0,
+      sessions: stats.byDay[key]?.[s] || 0,
       isToday: i === 0,
     });
   }
   return out;
 }
 
-function getAllTimeTotals() {
+function getAllTimeTotals(kind = 'focus') {
+  const { s, m } = keysFor(kind);
   let sessions = 0, minutes = 0;
   Object.values(stats.byDay).forEach(d => {
-    sessions += d.sessions || 0;
-    minutes  += d.minutes  || 0;
+    sessions += d[s] || 0;
+    minutes  += d[m] || 0;
   });
   return { sessions, minutes };
 }
@@ -1265,24 +1283,81 @@ modeTabs.forEach(tab => {
   tab.addEventListener('click', () => switchMode(tab.dataset.mode));
 });
 
-// Touch swipe support
-let touchStartX = null;
-let touchStartY = null;
+// Interactive carousel drag — finger follows the panels, snaps on release.
+// Supports both touch (mobile) and mouse (desktop drag).
+let drag = null;
+
+function modePercent() { return currentMode === 'sleep' ? -50 : 0; }
+
+function dragStart(x, y) {
+  drag = { startX: x, startY: y, startPercent: modePercent(), horizontal: false, decided: false };
+  modeTrack.classList.add('dragging');
+}
+
+function dragMove(x, y) {
+  if (!drag) return;
+  const dx = x - drag.startX;
+  const dy = y - drag.startY;
+
+  // Decide on first significant movement whether this is horizontal (drag) or vertical (scroll)
+  if (!drag.decided && (Math.abs(dx) > 6 || Math.abs(dy) > 6)) {
+    drag.horizontal = Math.abs(dx) > Math.abs(dy);
+    drag.decided = true;
+  }
+  if (!drag.horizontal) return;
+
+  const viewportWidth = modeViewport.offsetWidth || 1;
+  const dxPercent = (dx / viewportWidth) * 50; // each panel = 50% of the track
+  // Clamp so user can't drag past the edges
+  let newPercent = drag.startPercent + dxPercent;
+  newPercent = Math.max(-50, Math.min(0, newPercent));
+  modeTrack.style.transform = `translateX(${newPercent}%)`;
+}
+
+function dragEnd(x) {
+  if (!drag) return;
+  modeTrack.classList.remove('dragging');
+  modeTrack.style.transform = ''; // hand control back to the class
+
+  if (drag.horizontal) {
+    const dx = x - drag.startX;
+    const threshold = (modeViewport.offsetWidth || 1) / 4; // 25%
+    if (dx < -threshold) switchMode('sleep');
+    else if (dx > threshold) switchMode('focus');
+  }
+  drag = null;
+}
+
 modeViewport.addEventListener('touchstart', (e) => {
-  touchStartX = e.changedTouches[0].screenX;
-  touchStartY = e.changedTouches[0].screenY;
+  dragStart(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
+}, { passive: true });
+
+modeViewport.addEventListener('touchmove', (e) => {
+  if (!drag) return;
+  dragMove(e.touches[0].clientX, e.touches[0].clientY);
 }, { passive: true });
 
 modeViewport.addEventListener('touchend', (e) => {
-  if (touchStartX === null) return;
-  const dx = e.changedTouches[0].screenX - touchStartX;
-  const dy = e.changedTouches[0].screenY - touchStartY;
-  touchStartX = touchStartY = null;
-  // Require mostly-horizontal swipe of at least 50px so we don't fight scrolling
-  if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy)) return;
-  if (dx < 0) switchMode('sleep');
-  else        switchMode('focus');
-}, { passive: true });
+  if (!drag) return;
+  dragEnd(e.changedTouches[0].clientX);
+});
+
+// Desktop mouse-drag (skip on form controls so sliders/buttons still work)
+modeViewport.addEventListener('mousedown', (e) => {
+  if (e.button !== 0) return;
+  if (e.target.closest('input, button, .duration-control')) return;
+  dragStart(e.clientX, e.clientY);
+});
+
+document.addEventListener('mousemove', (e) => {
+  if (!drag) return;
+  dragMove(e.clientX, e.clientY);
+});
+
+document.addEventListener('mouseup', (e) => {
+  if (!drag) return;
+  dragEnd(e.clientX);
+});
 
 // ---------- Sleep mode ----------
 // Lives entirely in the Sleep panel. Selecting a duration starts a fade:
@@ -1333,7 +1408,7 @@ function renderSleepPanel() {
     return;
   }
 
-  // Idle state
+  // Idle state — duration cards, active sounds, and the sleep stats block
   sleepPanel.innerHTML = `
     ${MOON_SVG}
     <h2 class="sleep-headline">Drift off gently</h2>
@@ -1345,11 +1420,71 @@ function renderSleepPanel() {
       <button class="sleep-duration-card" type="button" data-min="60"><span class="num">60</span><span class="unit">min</span></button>
     </div>
     <div class="sleep-active-sounds" id="sleepActiveSoundsWrap"></div>
+
+    <div class="sleep-stats-block" id="sleepStatsBlock">
+      <div class="sleep-stats-header">
+        <span class="sleep-stats-title">Sleep stats</span>
+        <span class="sleep-stats-subtitle">Last 7 days</span>
+      </div>
+      <div class="sleep-stats-main">
+        <div class="sleep-stats-today">
+          <div class="sleep-stats-today-number" id="sleepStatsTodayMins">0</div>
+          <div class="sleep-stats-today-label">min last night</div>
+        </div>
+        <div class="sleep-stats-streak" id="sleepStatsStreakWrap">
+          <svg class="sleep-stats-streak-icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+            <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linejoin="round" stroke-linecap="round"/>
+          </svg>
+          <div class="sleep-stats-streak-content">
+            <span class="sleep-stats-streak-number" id="sleepStatsStreakNumber">0</span>
+            <span class="sleep-stats-streak-label">night streak</span>
+          </div>
+        </div>
+      </div>
+      <div class="sleep-stats-heatmap" id="sleepStatsHeatmap"></div>
+      <div class="sleep-stats-footer">
+        All time · <strong id="sleepStatsAllSessions">0</strong> nights · <strong id="sleepStatsAllMinutes">0m</strong>
+      </div>
+    </div>
   `;
   sleepPanel.querySelectorAll('.sleep-duration-card').forEach(card => {
     card.addEventListener('click', () => startSleep(parseInt(card.dataset.min, 10)));
   });
   renderSleepActiveSounds();
+  renderSleepStats();
+}
+
+function renderSleepStats() {
+  const todayMinsEl = document.getElementById('sleepStatsTodayMins');
+  if (!todayMinsEl) return; // sleep panel not currently in idle state
+
+  const today = stats.byDay[todayKey()]?.sleepMinutes || 0;
+  todayMinsEl.textContent = today;
+
+  const streak = getCurrentStreak('sleep');
+  const streakNumberEl = document.getElementById('sleepStatsStreakNumber');
+  const streakWrap = document.getElementById('sleepStatsStreakWrap');
+  streakNumberEl.textContent = streak;
+  streakWrap.classList.toggle('inactive', streak === 0);
+
+  const heatmapEl = document.getElementById('sleepStatsHeatmap');
+  heatmapEl.innerHTML = '';
+  getLast7Days('sleep').forEach(day => {
+    const cell = document.createElement('div');
+    cell.className = 'heat-cell';
+    cell.dataset.level = minutesToLevel(day.minutes);
+    if (day.isToday) cell.classList.add('today');
+    cell.title = `${day.minutes} min · ${day.sessions} session${day.sessions === 1 ? '' : 's'}`;
+    const label = document.createElement('span');
+    label.className = 'heat-letter';
+    label.textContent = day.letter;
+    cell.appendChild(label);
+    heatmapEl.appendChild(cell);
+  });
+
+  const total = getAllTimeTotals('sleep');
+  document.getElementById('sleepStatsAllSessions').textContent = total.sessions;
+  document.getElementById('sleepStatsAllMinutes').textContent  = formatMinutes(total.minutes);
 }
 
 const SOUND_LABELS = {
@@ -1423,6 +1558,9 @@ function completeSleep() {
   sleep.completed = true;
 
   Object.keys(activeNodes).forEach(id => deactivateSound(id));
+
+  // Record stats — count completed sleep sessions only
+  recordSleepSession(Math.round(sleep.durationSec / 60));
 
   document.body.classList.remove('sleeping');
   document.body.classList.add('sleep-complete');
