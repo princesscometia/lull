@@ -513,36 +513,54 @@ function createThunder(ctx, dest) {
   lfo.connect(lfoDepth); lfoDepth.connect(windGain.gain);
   lfo.start();
 
-  // Distant rumble: brief envelope on low-passed brown noise.
-  // Cutoff sits in the 150-270Hz range — deep enough to feel rumbly,
-  // but high enough that the energy carries on laptop/phone speakers.
+  // Rumbles come in two flavors:
+  //  - distant (most common): low cutoff, slower attack, the classic rolling rumble
+  //  - closer (~30%): higher cutoff, faster attack, more present and impactful
   let timeoutId = null;
   let stopped = false;
 
   function triggerRumble() {
     if (stopped) return;
+    const isCloser = Math.random() < 0.3;
     const now = ctx.currentTime;
-    const duration = 3.5 + Math.random() * 4;
-    const rumble = makeBrownNoiseSource(ctx);
-    const filter = ctx.createBiquadFilter();
-    filter.type = 'lowpass'; filter.frequency.value = 150 + Math.random() * 120;
-    const env = ctx.createGain();
-    env.gain.setValueAtTime(0, now);
-    env.gain.linearRampToValueAtTime(0.75 + Math.random() * 0.4, now + 0.4 + Math.random() * 0.5);
-    env.gain.exponentialRampToValueAtTime(0.001, now + duration);
-    rumble.connect(filter); filter.connect(env); env.connect(bus);
-    rumble.start(now);
-    rumble.stop(now + duration + 0.2);
+
+    if (isCloser) {
+      // Closer strike — brighter, sharper, more in-your-face
+      const duration = 3 + Math.random() * 3;
+      const rumble = makeBrownNoiseSource(ctx);
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'lowpass'; filter.frequency.value = 380 + Math.random() * 240;
+      const env = ctx.createGain();
+      env.gain.setValueAtTime(0, now);
+      env.gain.linearRampToValueAtTime(1.0 + Math.random() * 0.4, now + 0.2 + Math.random() * 0.3);
+      env.gain.exponentialRampToValueAtTime(0.001, now + duration);
+      rumble.connect(filter); filter.connect(env); env.connect(bus);
+      rumble.start(now);
+      rumble.stop(now + duration + 0.2);
+    } else {
+      // Distant rolling rumble — louder than before but same character
+      const duration = 3.5 + Math.random() * 4;
+      const rumble = makeBrownNoiseSource(ctx);
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'lowpass'; filter.frequency.value = 180 + Math.random() * 140;
+      const env = ctx.createGain();
+      env.gain.setValueAtTime(0, now);
+      env.gain.linearRampToValueAtTime(0.85 + Math.random() * 0.4, now + 0.4 + Math.random() * 0.5);
+      env.gain.exponentialRampToValueAtTime(0.001, now + duration);
+      rumble.connect(filter); filter.connect(env); env.connect(bus);
+      rumble.start(now);
+      rumble.stop(now + duration + 0.2);
+    }
   }
 
   function scheduleNext() {
     if (stopped) return;
-    const delay = 16000 + Math.random() * 26000; // 16–42s
+    const delay = 9000 + Math.random() * 14000; // 9–23s, ~2x more frequent
     timeoutId = setTimeout(() => { triggerRumble(); scheduleNext(); }, delay);
   }
 
   // First rumble a few seconds in
-  timeoutId = setTimeout(() => { triggerRumble(); scheduleNext(); }, 4000 + Math.random() * 4000);
+  timeoutId = setTimeout(() => { triggerRumble(); scheduleNext(); }, 3000 + Math.random() * 3000);
 
   return {
     bus,
