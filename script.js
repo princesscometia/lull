@@ -22,9 +22,9 @@ const breakInput   = document.getElementById('breakMin');
 // ---------- State ----------
 const RING_CIRCUMFERENCE = 678.58; // 2 * π * 108
 
-// Wave-line config (sinusoidal path just inside the ring)
-const WAVE_RADIUS    = 100;
-const WAVE_AMPLITUDE = 3.5;
+// Wave-line config (sinusoidal path weaving through the ring)
+const WAVE_RADIUS    = 108;  // same mean radius as the ring → wave crosses through it
+const WAVE_AMPLITUDE = 5;
 const WAVE_CYCLES    = 24;   // integer → path closes cleanly
 const WAVE_SEGMENTS  = 360;
 let   WAVE_LENGTH    = 0;    // measured after first build
