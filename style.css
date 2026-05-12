@@ -899,6 +899,205 @@ input[type="range"]::-moz-range-thumb {
 }
 
 /* =========================================================
+   STATS CARD
+   ========================================================= */
+
+.stats-card {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 26px 28px;
+}
+
+.stats-card-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.stats-title {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 20px;
+  color: var(--c-foam);
+  letter-spacing: -0.01em;
+}
+
+.stats-subtitle {
+  font-size: 10px;
+  color: var(--c-text-faint);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.stats-main {
+  display: grid;
+  grid-template-columns: 1fr 1px 1fr;
+  gap: 14px;
+  align-items: center;
+}
+
+.stats-main::before {
+  content: '';
+  grid-column: 2;
+  align-self: stretch;
+  background: linear-gradient(180deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.12) 50%,
+    transparent 100%);
+  width: 1px;
+}
+
+.stats-today {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.stats-today-number {
+  font-family: var(--font-display);
+  font-weight: 300;
+  font-size: 44px;
+  line-height: 1;
+  color: var(--c-foam);
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 16px rgba(168, 230, 220, 0.25);
+}
+
+.stats-today-label {
+  font-size: 10px;
+  color: var(--c-text-faint);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+.stats-streak {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--c-foam);
+  transition: opacity 0.3s ease, color 0.3s ease;
+}
+
+.stats-streak.inactive {
+  opacity: 0.4;
+  color: var(--c-text-faint);
+}
+
+.stats-streak-icon {
+  color: var(--c-aqua);
+  filter: drop-shadow(0 0 6px rgba(127, 209, 197, 0.4));
+  flex-shrink: 0;
+}
+
+.stats-streak.inactive .stats-streak-icon {
+  color: var(--c-text-faint);
+  filter: none;
+}
+
+.stats-streak-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.stats-streak-number {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 24px;
+  line-height: 1;
+  color: var(--c-foam);
+  font-variant-numeric: tabular-nums;
+}
+
+.stats-streak-label {
+  font-size: 9px;
+  color: var(--c-text-faint);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+/* Heatmap */
+.stats-heatmap {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 5px;
+}
+
+.heat-cell {
+  aspect-ratio: 1;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 3px;
+  cursor: default;
+  transition: transform 0.15s ease, background 0.25s ease, border-color 0.25s ease;
+}
+
+.heat-cell:hover {
+  transform: translateY(-2px);
+}
+
+.heat-cell.today {
+  border-color: rgba(168, 230, 220, 0.45);
+  box-shadow: 0 0 0 1px rgba(168, 230, 220, 0.2);
+}
+
+.heat-cell[data-level="1"] { background: rgba(127, 209, 197, 0.18); }
+.heat-cell[data-level="2"] { background: rgba(127, 209, 197, 0.38); }
+.heat-cell[data-level="3"] { background: rgba(127, 209, 197, 0.62); }
+.heat-cell[data-level="4"] {
+  background: rgba(127, 209, 197, 0.85);
+  box-shadow: 0 0 12px rgba(127, 209, 197, 0.35);
+}
+
+.heat-letter {
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: var(--c-text-faint);
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.heat-cell[data-level="3"] .heat-letter,
+.heat-cell[data-level="4"] .heat-letter {
+  color: rgba(8, 36, 50, 0.7);
+}
+
+.heat-cell.today .heat-letter {
+  color: var(--c-foam);
+  font-weight: 600;
+}
+
+.heat-cell[data-level="3"].today .heat-letter,
+.heat-cell[data-level="4"].today .heat-letter {
+  color: rgba(8, 36, 50, 0.85);
+}
+
+.stats-footer {
+  text-align: center;
+}
+
+.stats-all-time {
+  font-size: 11px;
+  color: var(--c-text-faint);
+  letter-spacing: 0.05em;
+}
+
+.stats-all-time strong {
+  color: var(--c-foam);
+  font-weight: 500;
+}
+
+/* =========================================================
    SETTINGS
    ========================================================= */
 

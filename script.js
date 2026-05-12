@@ -26,6 +26,13 @@ const presetSaveBtn   = document.getElementById('presetSaveBtn');
 const presetSaveForm  = document.getElementById('presetSaveForm');
 const presetSaveInput = document.getElementById('presetSaveInput');
 const themePicker     = document.getElementById('themePicker');
+const statsTodayMins  = document.getElementById('statsTodayMins');
+const statsStreakWrap = document.getElementById('statsStreakWrap');
+const statsStreakNumber = document.getElementById('statsStreakNumber');
+const statsStreakLabel  = document.getElementById('statsStreakLabel');
+const statsHeatmap    = document.getElementById('statsHeatmap');
+const statsAllSessions = document.getElementById('statsAllSessions');
+const statsAllMinutes  = document.getElementById('statsAllMinutes');
 
 // ---------- State ----------
 const RING_CIRCUMFERENCE = 678.58; // 2 * π * 108
@@ -88,6 +95,10 @@ const BUILTIN_PRESETS = [
 
 const CUSTOM_PRESETS_KEY = 'lull-custom-presets-v1';
 let currentPresetId = null;
+
+// ---------- Stats ----------
+const STATS_KEY = 'lull-stats-v1';
+let stats = { byDay: {} };
 // Smart hybrid: linked if the first sound was started while a timer was running.
 // Independent if the user started a mix while idle (pure ambience).
 let mixLinkedToTimer = false;
@@ -299,6 +310,7 @@ function completePhase() {
     state.sessionsToday += 1;
     state.lastDate = todayKey();
     saveState();
+    recordFocusSession(state.workMin);
     state.phase = 'break';
     state.remaining     = state.breakMin * 60;
     state.totalForPhase = state.breakMin * 60;
@@ -807,6 +819,130 @@ function playChime() {
 }
 
 // =========================================================
+//   STATS
+// =========================================================
+
+function loadStats() {
+  try {
+    const raw = localStorage.getItem(STATS_KEY);
+    if (raw) stats = JSON.parse(raw);
+    if (!stats.byDay) stats.byDay = {};
+  } catch (e) {
+    stats = { byDay: {} };
+  }
+}
+
+function saveStatsToStorage() {
+  localStorage.setItem(STATS_KEY, JSON.stringify(stats));
+}
+
+function recordFocusSession(minutes) {
+  const day = todayKey();
+  if (!stats.byDay[day]) stats.byDay[day] = { sessions: 0, minutes: 0 };
+  stats.byDay[day].sessions += 1;
+  stats.byDay[day].minutes += minutes;
+  saveStatsToStorage();
+  renderStats();
+}
+
+function dayKeyFor(date) {
+  return `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
+}
+
+function getCurrentStreak() {
+  let streak = 0;
+  const cursor = new Date();
+  const todayHasSessions = (stats.byDay[todayKey()]?.sessions || 0) > 0;
+  // If today is empty, count from yesterday backward (streak is still "alive" until end of today)
+  if (!todayHasSessions) cursor.setDate(cursor.getDate() - 1);
+
+  while (true) {
+    const key = dayKeyFor(cursor);
+    if ((stats.byDay[key]?.sessions || 0) > 0) {
+      streak += 1;
+      cursor.setDate(cursor.getDate() - 1);
+    } else break;
+  }
+  return streak;
+}
+
+function getLast7Days() {
+  const out = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const key = dayKeyFor(d);
+    out.push({
+      key,
+      letter: d.toLocaleDateString(undefined, { weekday: 'short' })[0],
+      minutes: stats.byDay[key]?.minutes || 0,
+      sessions: stats.byDay[key]?.sessions || 0,
+      isToday: i === 0,
+    });
+  }
+  return out;
+}
+
+function getAllTimeTotals() {
+  let sessions = 0, minutes = 0;
+  Object.values(stats.byDay).forEach(d => {
+    sessions += d.sessions || 0;
+    minutes  += d.minutes  || 0;
+  });
+  return { sessions, minutes };
+}
+
+function formatMinutes(mins) {
+  if (mins < 60) return `${mins}m`;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return m === 0 ? `${h}h` : `${h}h ${m}m`;
+}
+
+function minutesToLevel(mins) {
+  if (mins === 0)  return 0;
+  if (mins < 15)   return 1;
+  if (mins < 45)   return 2;
+  if (mins < 90)   return 3;
+  return 4;
+}
+
+function renderStats() {
+  if (!statsTodayMins) return; // not yet in DOM during early init
+
+  const today = stats.byDay[todayKey()]?.minutes || 0;
+  statsTodayMins.textContent = today;
+
+  const streak = getCurrentStreak();
+  statsStreakNumber.textContent = streak;
+  statsStreakLabel.textContent = streak === 1 ? 'day streak' : 'day streak';
+  statsStreakWrap.classList.toggle('inactive', streak === 0);
+
+  // Heatmap
+  const days = getLast7Days();
+  statsHeatmap.innerHTML = '';
+  days.forEach(day => {
+    const cell = document.createElement('div');
+    cell.className = 'heat-cell';
+    cell.dataset.level = minutesToLevel(day.minutes);
+    if (day.isToday) cell.classList.add('today');
+    cell.title = `${day.minutes} min · ${day.sessions} session${day.sessions === 1 ? '' : 's'}`;
+
+    const label = document.createElement('span');
+    label.className = 'heat-letter';
+    label.textContent = day.letter;
+    cell.appendChild(label);
+
+    statsHeatmap.appendChild(cell);
+  });
+
+  // All-time
+  const total = getAllTimeTotals();
+  statsAllSessions.textContent = total.sessions;
+  statsAllMinutes.textContent  = formatMinutes(total.minutes);
+}
+
+// =========================================================
 //   PRESETS
 // =========================================================
 
@@ -1132,10 +1268,12 @@ document.addEventListener('keydown', (e) => {
 
 // ---------- Init ----------
 loadState();
+loadStats();
 initWave();
 render();
 renderSoundUI();
 renderPresets();
+renderStats();
 applyImmersive();
 applyTheme();
 animateWave();
