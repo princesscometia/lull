@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lull — Drift into focus</title>
+  <meta name="description" content="A calm, beautiful focus timer with ambient ocean sounds. Drift into focus." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- Animated aquatic background -->
+  <div class="ocean-bg">
+    <div class="caustics"></div>
+    <svg class="waves" viewBox="0 0 1440 320" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+      <path class="wave wave-1" d="M0,160 C320,260 720,80 1440,180 L1440,320 L0,320 Z"></path>
+      <path class="wave wave-2" d="M0,200 C360,120 720,260 1440,160 L1440,320 L0,320 Z"></path>
+      <path class="wave wave-3" d="M0,240 C400,180 800,300 1440,220 L1440,320 L0,320 Z"></path>
+    </svg>
+    <div class="particles"></div>
+  </div>
+
+  <!-- App shell -->
+  <main class="app">
+    <header class="header">
+      <h1 class="brand">lull<span class="brand-dot">~</span></h1>
+      <p class="tagline">Drift into focus.</p>
+    </header>
+
+    <!-- Timer -->
+    <section class="timer-card glass">
+      <div class="timer-ring-wrap">
+        <svg class="timer-ring" viewBox="0 0 240 240">
+          <defs>
+            <linearGradient id="ringGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#a8e6dc" />
+              <stop offset="100%" stop-color="#4d9aaf" />
+            </linearGradient>
+          </defs>
+          <circle class="ring-track" cx="120" cy="120" r="108" />
+          <circle class="ring-progress" cx="120" cy="120" r="108" />
+        </svg>
+        <div class="timer-display">
+          <div class="time" id="time">25:00</div>
+          <div class="phase" id="phase">Focus</div>
+        </div>
+      </div>
+
+      <div class="controls">
+        <button class="btn btn-secondary" id="resetBtn" aria-label="Reset timer">Reset</button>
+        <button class="btn btn-primary" id="startBtn" aria-label="Start timer">Start</button>
+        <button class="btn btn-secondary" id="skipBtn" aria-label="Skip phase">Skip</button>
+      </div>
+
+      <div class="meta">
+        <span class="sessions">Sessions today: <strong id="sessionCount">0</strong></span>
+      </div>
+    </section>
+
+    <!-- Sound panel -->
+    <section class="sound-card glass">
+      <div class="sound-header">
+        <button class="sound-toggle" id="soundToggle" aria-label="Toggle ambient sound">
+          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+            <path d="M3 10v4h4l5 5V5L7 10H3z" fill="currentColor"/>
+            <path id="wavePath" d="M16 8c1.5 1.2 2.5 2.5 2.5 4s-1 2.8-2.5 4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+          </svg>
+          <span id="soundLabel">Ocean Waves</span>
+        </button>
+      </div>
+      <div class="volume-row">
+        <span class="vol-icon">~</span>
+        <input type="range" id="volume" min="0" max="100" value="50" aria-label="Volume" />
+        <span class="vol-value" id="volValue">50</span>
+      </div>
+    </section>
+
+    <!-- Settings (subtle, collapsed) -->
+    <details class="settings glass-subtle">
+      <summary>Settings</summary>
+      <div class="setting-row">
+        <label for="workMin">Focus length (min)</label>
+        <input type="number" id="workMin" min="1" max="120" value="25" />
+      </div>
+      <div class="setting-row">
+        <label for="breakMin">Break length (min)</label>
+        <input type="number" id="breakMin" min="1" max="60" value="5" />
+      </div>
+    </details>
+
+    <footer class="footer">
+      <span>made with calm · v0.1</span>
+    </footer>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
