@@ -1049,6 +1049,69 @@ body.immersive .wave-5 { fill-opacity: 0.22; }
 }
 
 /* =========================================================
+   FISH SHADOWS (lone fish + small schools drifting by)
+   ========================================================= */
+
+.fish-shadows {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.fish-swim {
+  position: absolute;
+  left: -20%;
+  will-change: transform, opacity;
+  animation: fish-swim-ltr linear infinite;
+}
+
+.fish-swim.rtl {
+  left: auto;
+  right: -20%;
+  animation-name: fish-swim-rtl;
+}
+
+/* Flip the SVG so the fish faces the direction of travel for right-to-left swimmers */
+.fish-swim.rtl > svg {
+  transform: scaleX(-1);
+}
+
+.fish-body,
+.fish-body path {
+  fill: rgba(180, 220, 230, 0.16);
+}
+
+.fish-swim svg {
+  filter: blur(1.8px);
+}
+
+/* Larger lone fish — slightly more blur for depth */
+.fish-swim:not(:has(g)) svg {
+  filter: blur(2.4px);
+}
+
+@keyframes fish-swim-ltr {
+  0%   { transform: translateX(0)     translateY(0);    opacity: 0; }
+  6%   {                                                opacity: 0.85; }
+  25%  { transform: translateX(35vw)  translateY(-14px); }
+  50%  { transform: translateX(70vw)  translateY(12px);  }
+  75%  { transform: translateX(105vw) translateY(-9px);  }
+  94%  {                                                opacity: 0.85; }
+  100% { transform: translateX(140vw) translateY(0);    opacity: 0; }
+}
+
+@keyframes fish-swim-rtl {
+  0%   { transform: translateX(0)      translateY(0);    opacity: 0; }
+  6%   {                                                 opacity: 0.85; }
+  25%  { transform: translateX(-35vw)  translateY(11px); }
+  50%  { transform: translateX(-70vw)  translateY(-13px); }
+  75%  { transform: translateX(-105vw) translateY(8px);  }
+  94%  {                                                 opacity: 0.85; }
+  100% { transform: translateX(-140vw) translateY(0);    opacity: 0; }
+}
+
+/* =========================================================
    BUBBLES (rising from the bottom)
    ========================================================= */
 
@@ -1125,7 +1188,8 @@ body.immersive .wave-5 { fill-opacity: 0.22; }
   .particles,
   .brand-dot,
   .bubble,
-  .light-ray {
+  .light-ray,
+  .fish-swim {
     animation: none;
   }
 }
