@@ -503,30 +503,32 @@ function createThunder(ctx, dest) {
   // Quiet wind bed so it's not silent between rumbles
   const wind = makeBrownNoiseSource(ctx);
   const windLP = ctx.createBiquadFilter();
-  windLP.type = 'lowpass'; windLP.frequency.value = 280;
-  const windGain = ctx.createGain(); windGain.gain.value = 0.1;
+  windLP.type = 'lowpass'; windLP.frequency.value = 320;
+  const windGain = ctx.createGain(); windGain.gain.value = 0.16;
   wind.connect(windLP); windLP.connect(windGain); windGain.connect(bus);
   wind.start();
 
   const lfo = ctx.createOscillator(); lfo.frequency.value = 0.07;
-  const lfoDepth = ctx.createGain();  lfoDepth.gain.value = 0.06;
+  const lfoDepth = ctx.createGain();  lfoDepth.gain.value = 0.08;
   lfo.connect(lfoDepth); lfoDepth.connect(windGain.gain);
   lfo.start();
 
-  // Distant rumble: brief envelope on heavily low-passed brown noise
+  // Distant rumble: brief envelope on low-passed brown noise.
+  // Cutoff sits in the 150-270Hz range — deep enough to feel rumbly,
+  // but high enough that the energy carries on laptop/phone speakers.
   let timeoutId = null;
   let stopped = false;
 
   function triggerRumble() {
     if (stopped) return;
     const now = ctx.currentTime;
-    const duration = 2.5 + Math.random() * 3.5;
+    const duration = 3.5 + Math.random() * 4;
     const rumble = makeBrownNoiseSource(ctx);
     const filter = ctx.createBiquadFilter();
-    filter.type = 'lowpass'; filter.frequency.value = 90 + Math.random() * 70;
+    filter.type = 'lowpass'; filter.frequency.value = 150 + Math.random() * 120;
     const env = ctx.createGain();
     env.gain.setValueAtTime(0, now);
-    env.gain.linearRampToValueAtTime(0.55 + Math.random() * 0.35, now + 0.4 + Math.random() * 0.5);
+    env.gain.linearRampToValueAtTime(0.75 + Math.random() * 0.4, now + 0.4 + Math.random() * 0.5);
     env.gain.exponentialRampToValueAtTime(0.001, now + duration);
     rumble.connect(filter); filter.connect(env); env.connect(bus);
     rumble.start(now);
