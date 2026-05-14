@@ -11,9 +11,17 @@
   <link rel="stylesheet" href="style.css" />
 
   <!-- Vercel Web Analytics — privacy-respecting pageviews, no cookies.
-       Vercel serves this script automatically once Web Analytics is enabled
-       in the project dashboard. -->
+       Analytics queue for configuration before script loads. -->
+  <script>
+    window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+  </script>
   <script defer src="/_vercel/insights/script.js"></script>
+
+  <!-- Vercel Speed Insights — real user monitoring for Core Web Vitals. -->
+  <script>
+    window.si = window.si || function () { (window.siq = window.siq || []).push(arguments); };
+  </script>
+  <script defer src="/_vercel/speed-insights/script.js"></script>
 </head>
 <body>
   <!-- Immersive background overlay (fades in/out via opacity so it can be transitioned) -->
