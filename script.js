@@ -25,6 +25,8 @@ const presetSaveChip  = document.getElementById('presetSaveChip');
 const presetSaveBtn   = document.getElementById('presetSaveBtn');
 const presetSaveForm  = document.getElementById('presetSaveForm');
 const presetSaveInput = document.getElementById('presetSaveInput');
+const presetShareBtn  = document.getElementById('presetShareBtn');
+const presetShareLabel = document.getElementById('presetShareLabel');
 const themePicker     = document.getElementById('themePicker');
 const sleepDim         = document.getElementById('sleepDim');
 const sleepPanel       = document.getElementById('sleepPanel');
@@ -1178,6 +1180,116 @@ function noteMixDirtied() {
 }
 
 // =========================================================
+//   SHAREABLE MIX URLS
+// =========================================================
+// Encode the current state into a URL-safe base64 blob so anyone opening
+// the link gets the exact same mix loaded. No backend required — the URL
+// IS the storage. The 'ctx' field carries which tab the mix was created
+// on, so opening a "sleep mix" link drops the recipient on the Sleep tab.
+
+function b64UrlEncode(str) {
+  return btoa(str)
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+}
+
+function b64UrlDecode(str) {
+  let s = str.replace(/-/g, '+').replace(/_/g, '/');
+  while (s.length % 4 !== 0) s += '=';
+  return atob(s);
+}
+
+function buildShareUrl() {
+  const ctxState = soundStates[activeMixContext];
+  const payload = {
+    v: 1,
+    ctx: activeMixContext,
+    s: Object.fromEntries(
+      Object.entries(ctxState).map(([k, v]) => [k, { a: v.active ? 1 : 0, v: v.volume }])
+    ),
+    m: masterVolume,
+    t: currentTheme,
+  };
+  const encoded = b64UrlEncode(JSON.stringify(payload));
+  return `${location.origin}${location.pathname}?m=${encoded}`;
+}
+
+function applySharedMix(payload) {
+  if (!payload || payload.v !== 1) return;
+
+  // Theme first (visual context)
+  if (payload.t && typeof payload.t === 'string') {
+    currentTheme = payload.t;
+    applyTheme();
+  }
+
+  // Master
+  if (typeof payload.m === 'number') {
+    masterVolume = Math.max(0, Math.min(100, payload.m));
+  }
+
+  // Target context — switch tabs if needed
+  const targetCtx = payload.ctx === 'sleep' ? 'sleep' : 'focus';
+
+  // Apply sound state to the target context
+  const target = soundStates[targetCtx];
+  Object.entries(payload.s || {}).forEach(([id, vals]) => {
+    if (!target[id]) return;
+    if (typeof vals.v === 'number') target[id].volume = Math.max(0, Math.min(100, vals.v));
+    // We'll activate after we know the context; just record desired state for now
+    target[id].active = !!vals.a;
+  });
+
+  // Switch tab/audio context to the target — switchAudioContext will start the
+  // sounds the new context has flagged active
+  if (currentMode !== targetCtx) switchMode(targetCtx);
+  else if (activeMixContext !== targetCtx) switchAudioContext(targetCtx);
+  else {
+    // Already on the right context, but sounds may already be playing from
+    // before the share was applied. Sync audio to match the new state.
+    Object.entries(target).forEach(([id, s]) => {
+      const playing = !!activeNodes[id];
+      if (s.active && !playing) startSoundAudio(id);
+      if (!s.active && playing) stopSoundAudio(id);
+    });
+  }
+
+  // Sync master to UI
+  if (masterGain && audioCtx) {
+    masterGain.gain.setTargetAtTime(masterVolume / 100 * 0.6, audioCtx.currentTime, 0.1);
+  }
+  document.querySelectorAll('.master-row input[type="range"]').forEach(sl => sl.value = masterVolume);
+  document.querySelectorAll('.vol-value').forEach(el => el.textContent = masterVolume);
+
+  renderSoundUI();
+  if (currentMode === 'sleep') renderSleepPanel();
+
+  saveState();
+}
+
+function readSharedMixFromUrl() {
+  const params = new URLSearchParams(location.search);
+  const encoded = params.get('m');
+  if (!encoded) return null;
+  try {
+    return JSON.parse(b64UrlDecode(encoded));
+  } catch (e) {
+    return null;
+  }
+}
+
+// Show a transient "Copied" state on the share button itself (no extra toast UI)
+function showShareCopied() {
+  presetShareBtn.classList.add('copied');
+  presetShareLabel.textContent = 'Copied';
+  setTimeout(() => {
+    presetShareBtn.classList.remove('copied');
+    presetShareLabel.textContent = 'Share';
+  }, 1800);
+}
+
+// =========================================================
 //   EVENT LISTENERS
 // =========================================================
 
@@ -1262,6 +1374,25 @@ presetSaveInput.addEventListener('keydown', (e) => {
 presetSaveInput.addEventListener('blur', () => {
   // Cancel if blurred without committing
   setTimeout(() => presetSaveChip.classList.remove('saving'), 100);
+});
+
+// ---------- Share button ----------
+presetShareBtn.addEventListener('click', async () => {
+  const url = buildShareUrl();
+  try {
+    await navigator.clipboard.writeText(url);
+    showShareCopied();
+  } catch (e) {
+    // Fallback: select-and-copy via a hidden textarea (older browsers + insecure contexts)
+    const ta = document.createElement('textarea');
+    ta.value = url;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); showShareCopied(); } catch (_) {}
+    document.body.removeChild(ta);
+  }
 });
 
 // ---------- Duration controls (wheel / click / keyboard) ----------
@@ -1789,3 +1920,15 @@ renderSleepPanel();
 applyImmersive();
 applyTheme();
 animateWave();
+
+// If the URL carries a ?m=... shared mix, apply it and clean the URL so a
+// refresh doesn't re-apply (which would feel sticky to the user).
+const sharedMix = readSharedMixFromUrl();
+if (sharedMix) {
+  // Defer slightly so all other UI is fully initialized first
+  setTimeout(() => {
+    applySharedMix(sharedMix);
+    // Strip the param without reloading
+    history.replaceState(null, '', location.pathname);
+  }, 50);
+}

@@ -725,6 +725,39 @@ body.theme-twilight .wave-3 { fill: #7d5a85; }
   color: var(--c-text-faint);
 }
 
+/* Share button — sits alongside the save chip; same pill style */
+.preset-share-btn {
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--c-text-soft);
+  padding: 6px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.preset-share-btn:hover {
+  background: rgba(255, 255, 255, 0.11);
+  color: var(--c-foam);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.preset-share-btn.copied {
+  background: linear-gradient(135deg, rgba(127, 209, 197, 0.32), rgba(168, 230, 220, 0.22));
+  border-color: rgba(168, 230, 220, 0.45);
+  color: var(--c-foam);
+}
+
+.preset-share-btn svg { flex-shrink: 0; }
+
 .mixer {
   display: flex;
   flex-direction: column;
