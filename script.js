@@ -1215,11 +1215,16 @@ function buildShareUrl() {
   return `${location.origin}${location.pathname}?m=${encoded}`;
 }
 
-function applySharedMix(payload) {
-  if (!payload || payload.v !== 1) return;
+// Strict allowlist of valid theme names — anything else gets rejected.
+// Protects against future code that might use the theme string in a way
+// where unexpected values could matter (e.g. interpolation, network requests).
+const VALID_THEMES = ['default', 'abyss', 'arctic', 'twilight'];
 
-  // Theme first (visual context)
-  if (payload.t && typeof payload.t === 'string') {
+function applySharedMix(payload) {
+  if (!payload || typeof payload !== 'object' || payload.v !== 1) return;
+
+  // Theme first (visual context). Must match allowlist — junk values are silently ignored.
+  if (typeof payload.t === 'string' && VALID_THEMES.includes(payload.t)) {
     currentTheme = payload.t;
     applyTheme();
   }
@@ -1268,12 +1273,20 @@ function applySharedMix(payload) {
   saveState();
 }
 
+// Hard caps on payload size so a maliciously huge URL can't burn CPU on
+// JSON.parse / atob. Legitimate mix URLs are ~225 chars; 4 KB is generous
+// and rejects anything that's clearly not ours.
+const MAX_SHARE_ENCODED_LEN = 4096;
+const MAX_SHARE_DECODED_LEN = 8192;
+
 function readSharedMixFromUrl() {
   const params = new URLSearchParams(location.search);
   const encoded = params.get('m');
-  if (!encoded) return null;
+  if (!encoded || encoded.length > MAX_SHARE_ENCODED_LEN) return null;
   try {
-    return JSON.parse(b64UrlDecode(encoded));
+    const json = b64UrlDecode(encoded);
+    if (json.length > MAX_SHARE_DECODED_LEN) return null;
+    return JSON.parse(json);
   } catch (e) {
     return null;
   }
