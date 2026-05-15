@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#4ea4b8"/>
+      <stop offset="40%" stop-color="#2d7a8c"/>
+      <stop offset="75%" stop-color="#1a5868"/>
+      <stop offset="100%" stop-color="#0e3d4c"/>
+    </linearGradient>
+    <linearGradient id="brand" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f4ede4"/>
+      <stop offset="100%" stop-color="#c8eee5"/>
+    </linearGradient>
+    <radialGradient id="caustic1" cx="0.2" cy="0.15" r="0.4">
+      <stop offset="0%" stop-color="rgba(200, 238, 229, 0.45)"/>
+      <stop offset="100%" stop-color="rgba(200, 238, 229, 0)"/>
+    </radialGradient>
+    <radialGradient id="caustic2" cx="0.85" cy="0.2" r="0.35">
+      <stop offset="0%" stop-color="rgba(168, 230, 220, 0.3)"/>
+      <stop offset="100%" stop-color="rgba(168, 230, 220, 0)"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect width="1200" height="630" fill="url(#caustic1)"/>
+  <rect width="1200" height="630" fill="url(#caustic2)"/>
+
+  <!-- Layered waves at bottom -->
+  <path d="M0,470 C200,430 400,510 800,450 C1000,420 1100,490 1200,460 L1200,630 L0,630 Z" fill="#a8e6dc" fill-opacity="0.18"/>
+  <path d="M0,520 C200,490 600,550 1000,510 L1200,540 L1200,630 L0,630 Z" fill="#7fc8d8" fill-opacity="0.22"/>
+  <path d="M0,560 C400,540 800,600 1200,550 L1200,630 L0,630 Z" fill="#5ba8bc" fill-opacity="0.28"/>
+
+  <!-- Floating bubbles -->
+  <circle cx="180" cy="220" r="8" fill="rgba(255,255,255,0.75)"/>
+  <circle cx="940" cy="180" r="5" fill="rgba(255,255,255,0.6)"/>
+  <circle cx="1060" cy="320" r="10" fill="rgba(255,255,255,0.7)"/>
+  <circle cx="280" cy="380" r="6" fill="rgba(255,255,255,0.55)"/>
+  <circle cx="120" cy="440" r="4" fill="rgba(255,255,255,0.5)"/>
+  <circle cx="1020" cy="450" r="7" fill="rgba(255,255,255,0.6)"/>
+
+  <!-- Wordmark -->
+  <text x="600" y="320" font-family="Fraunces, Georgia, serif" font-weight="300" font-size="200" fill="url(#brand)" text-anchor="middle" letter-spacing="-4">lull<tspan fill="#7fd1c5">~</tspan></text>
+
+  <!-- Tagline -->
+  <text x="600" y="385" font-family="Inter, -apple-system, system-ui, sans-serif" font-size="22" font-weight="400" fill="rgba(244, 237, 228, 0.85)" text-anchor="middle" letter-spacing="6">DRIFT INTO FOCUS</text>
+
+  <!-- Feature line -->
+  <text x="600" y="595" font-family="Inter, -apple-system, system-ui, sans-serif" font-size="15" font-weight="500" letter-spacing="2" fill="rgba(244, 237, 228, 0.75)" text-anchor="middle">POMODORO  ·  AMBIENT MIX  ·  SLEEP MODE  ·  FREE</text>
+</svg>
